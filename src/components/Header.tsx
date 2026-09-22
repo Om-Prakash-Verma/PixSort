@@ -1,0 +1,158 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers } from 'lucide-react';
+import { SystemStatus } from '../types.js';
+
+interface HeaderProps {
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  onExecuteSearch: (q: string) => void;
+  onClearSearch: () => void;
+  onOpenUpload: () => void;
+  onOpenInspector: () => void;
+  systemStatus: SystemStatus | null;
+  isSearching: boolean;
+}
+
+const SEARCH_SUGGESTIONS = [
+  'Pool party',
+  'Beach photos',
+  'Photos from my college trip',
+  'Birthday party',
+  'Sunset photos',
+  'Photos from the gym',
+  'Food photos',
+  'Outdoor party',
+  'Photos from July 2026',
+  'Beach photos from last summer',
+];
+
+export const Header: React.FC<HeaderProps> = ({
+  searchQuery,
+  onSearchChange,
+  onExecuteSearch,
+  onClearSearch,
+  onOpenUpload,
+  onOpenInspector,
+  systemStatus,
+  isSearching,
+}) => {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setShowSuggestions(false);
+      onExecuteSearch(searchQuery);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    onSearchChange(suggestion);
+    setShowSuggestions(false);
+    onExecuteSearch(suggestion);
+  };
+
+  return (
+    <header className="sticky top-0 z-30 bg-[#EEF2F6] border-b border-slate-200/80 px-4 lg:px-8 py-3.5 flex items-center justify-between gap-4">
+      {/* Brand Logo & Name */}
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="w-10 h-10 rounded-2xl neo-raised flex items-center justify-center text-blue-600">
+          <Sparkles className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-lg text-slate-800 tracking-tight">Photos</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+              AI Search
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 hidden sm:block">Powered by Gemini Multimodal Embeddings</p>
+        </div>
+      </div>
+
+      {/* Large Neomorphic Search Bar */}
+      <div ref={searchContainerRef} className="relative flex-1 max-w-2xl mx-auto">
+        <div className="relative flex items-center w-full">
+          <div className="absolute left-4 pointer-events-none text-slate-400 flex items-center">
+            {isSearching ? (
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 text-slate-400" />
+            )}
+          </div>
+          <input
+            id="main-photo-search-input"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={handleKeyDown}
+            placeholder='Search memories... try "Pool party", "Beach in July", "College trip"'
+            className="w-full pl-11 pr-10 py-2.5 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 neo-inset focus:outline-none focus:ring-1 focus:ring-slate-300 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={onClearSearch}
+              className="absolute right-3.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Suggestion Dropdown */}
+        {showSuggestions && (
+          <div className="absolute left-0 right-0 mt-2 p-3 rounded-2xl neo-raised-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-white/60">
+            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
+              <span>Suggested Natural Language Queries</span>
+              <span className="text-[10px] text-slate-400">Zero keyword reliance</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SEARCH_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => handleSelectSuggestion(suggestion)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-700 neo-btn hover:text-blue-600 flex items-center gap-1.5 text-left"
+                >
+                  <Search className="w-3 h-3 text-slate-400" />
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Header Actions */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        <button
+          onClick={onOpenInspector}
+          className="p-2.5 rounded-2xl neo-btn text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2 text-xs font-semibold"
+          title="Google Cloud Architecture Inspector"
+        >
+          <Layers className="w-4 h-4 text-blue-600" />
+          <span className="hidden xl:inline">AI Pipeline</span>
+        </button>
+
+        <button
+          onClick={onOpenUpload}
+          className="px-4 py-2.5 rounded-2xl neo-btn text-blue-700 hover:text-blue-800 flex items-center gap-2 text-xs font-bold"
+        >
+          <Upload className="w-4 h-4" />
+          <span className="hidden sm:inline">Upload</span>
+        </button>
+      </div>
+    </header>
+  );
+};
