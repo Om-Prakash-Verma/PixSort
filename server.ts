@@ -263,7 +263,12 @@ async function startServer() {
       (async () => {
         try {
           // AI Vision analysis
-          const vision = await aiService.analyzePhotoVision(dataBase64, mimeType || 'image/jpeg');
+          const vision = await aiService.analyzePhotoVision(
+            dataBase64,
+            mimeType || 'image/jpeg',
+            filename,
+            location
+          );
 
           // Multimodal embedding generation (Gemini Embedding 2)
           await dbService.updatePhoto(photoId, { processingStatus: 'INDEXING' });
