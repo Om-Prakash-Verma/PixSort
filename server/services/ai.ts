@@ -33,6 +33,9 @@ const CONCEPT_CLUSTERS: Record<string, string[]> = {
   friends: ['friends', 'hangout', 'night out', 'rooftop', 'party', 'laughing', 'drinks', 'friendship', 'board game', 'outdoor party', 'social', 'celebrating'],
 };
 
+// Resilient chain of vision models to handle transient 503/429 high demand spikes
+const VISION_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+
 export class GeminiAIService {
   private client: GoogleGenAI | null = null;
   private hasKey: boolean = false;
@@ -61,23 +64,36 @@ export class GeminiAIService {
   }
 
   /**
-   * Generates text embedding using Gemini Embedding 2
+   * Generates text embedding using Gemini Embedding 2 with retry for transient spikes
    */
   async embedText(text: string): Promise<number[]> {
     if (this.client && this.hasKey) {
-      try {
-        const response = await this.client.models.embedContent({
-          model: 'gemini-embedding-2-preview',
-          contents: [text],
-        });
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await this.client.models.embedContent({
+            model: 'gemini-embedding-2-preview',
+            contents: [text],
+          });
 
-        // @ts-ignore
-        const rawVector = response.embedding?.values || response.embeddings?.[0]?.values;
-        if (rawVector && Array.isArray(rawVector) && rawVector.length > 0) {
-          return this.normalizeVector(rawVector);
+          // @ts-ignore
+          const rawVector = response.embedding?.values || response.embeddings?.[0]?.values;
+          if (rawVector && Array.isArray(rawVector) && rawVector.length > 0) {
+            return this.normalizeVector(rawVector);
+          }
+        } catch (err: any) {
+          const isTransient =
+            err.status === 503 ||
+            err.status === 429 ||
+            err.code === 503 ||
+            err.code === 429 ||
+            (err.message && (err.message.includes('high demand') || err.message.includes('UNAVAILABLE')));
+          if (isTransient && attempt === 1) {
+            await new Promise((r) => setTimeout(r, 600));
+            continue;
+          }
+          console.warn('Gemini embedContent notice, using semantic vector fallback:', err.message);
+          break;
         }
-      } catch (err) {
-        console.warn('Gemini embedContent failed, using semantic fallback:', err);
       }
     }
 
@@ -85,31 +101,44 @@ export class GeminiAIService {
   }
 
   /**
-   * Generates multimodal image embedding using Gemini Embedding 2
+   * Generates multimodal image embedding using Gemini Embedding 2 with retry
    */
   async embedImage(base64Data: string, mimeType: string = 'image/jpeg'): Promise<number[]> {
     if (this.client && this.hasKey) {
-      try {
-        const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-        const response = await this.client.models.embedContent({
-          model: 'gemini-embedding-2-preview',
-          contents: [
-            {
-              inlineData: {
-                data: cleanBase64,
-                mimeType,
+      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await this.client.models.embedContent({
+            model: 'gemini-embedding-2-preview',
+            contents: [
+              {
+                inlineData: {
+                  data: cleanBase64,
+                  mimeType,
+                },
               },
-            },
-          ],
-        });
+            ],
+          });
 
-        // @ts-ignore
-        const rawVector = response.embedding?.values || response.embeddings?.[0]?.values;
-        if (rawVector && Array.isArray(rawVector) && rawVector.length > 0) {
-          return this.normalizeVector(rawVector);
+          // @ts-ignore
+          const rawVector = response.embedding?.values || response.embeddings?.[0]?.values;
+          if (rawVector && Array.isArray(rawVector) && rawVector.length > 0) {
+            return this.normalizeVector(rawVector);
+          }
+        } catch (err: any) {
+          const isTransient =
+            err.status === 503 ||
+            err.status === 429 ||
+            err.code === 503 ||
+            err.code === 429 ||
+            (err.message && (err.message.includes('high demand') || err.message.includes('UNAVAILABLE')));
+          if (isTransient && attempt === 1) {
+            await new Promise((r) => setTimeout(r, 600));
+            continue;
+          }
+          console.warn('Gemini embedImage notice, using fallback vector:', err.message);
+          break;
         }
-      } catch (err) {
-        console.warn('Gemini embedImage failed, using fallback:', err);
       }
     }
 
@@ -118,68 +147,103 @@ export class GeminiAIService {
   }
 
   /**
-   * Analyzes photo visual metadata using Gemini 3.8 Flash Vision (no face recognition)
+   * Analyzes photo visual metadata using resilient Gemini Vision chain (no face recognition)
    */
   async analyzePhotoVision(
     base64Data: string,
-    mimeType: string = 'image/jpeg'
+    mimeType: string = 'image/jpeg',
+    filename?: string,
+    locationHint?: string
   ): Promise<ExtractedPhotoMetadata> {
     if (this.client && this.hasKey) {
-      try {
-        const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-        const response = await this.client.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  data: cleanBase64,
-                  mimeType,
+      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+
+      for (const model of VISION_MODELS) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const response = await this.client.models.generateContent({
+              model,
+              contents: {
+                parts: [
+                  {
+                    inlineData: {
+                      data: cleanBase64,
+                      mimeType,
+                    },
+                  },
+                  {
+                    text: 'Analyze this personal photo. Do NOT identify specific individual people or face recognition. Provide a structured summary of what is seen in the image including scene description, objects, activities, environment (Indoor/Outdoor/Mixed), and time of day (Morning/Afternoon/Evening/Night/Golden Hour).',
+                  },
+                ],
+              },
+              config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    aiDescription: { type: Type.STRING },
+                    objects: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    activities: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    environment: { type: Type.STRING },
+                    time: { type: Type.STRING },
+                  },
+                  required: ['aiDescription', 'objects', 'activities', 'environment', 'time'],
                 },
               },
-              {
-                text: 'Analyze this personal photo. Do NOT identify specific individual people or face recognition. Provide a structured summary of what is seen in the image including scene description, objects, activities, environment (Indoor/Outdoor/Mixed), and time of day (Morning/Afternoon/Evening/Night/Golden Hour).',
-              },
-            ],
-          },
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                aiDescription: { type: Type.STRING },
-                objects: { type: Type.ARRAY, items: { type: Type.STRING } },
-                activities: { type: Type.ARRAY, items: { type: Type.STRING } },
-                environment: { type: Type.STRING },
-                time: { type: Type.STRING },
-              },
-              required: ['aiDescription', 'objects', 'activities', 'environment', 'time'],
-            },
-          },
-        });
+            });
 
-        if (response.text) {
-          const parsed = JSON.parse(response.text.trim());
-          return {
-            aiDescription: parsed.aiDescription || 'A personal memory captured in photograph.',
-            objects: parsed.objects || ['Subject', 'Background'],
-            activities: parsed.activities || ['Leisure'],
-            environment: parsed.environment || 'Outdoor',
-            time: parsed.time || 'Daytime',
-          };
+            if (response.text) {
+              const parsed = JSON.parse(response.text.trim());
+              return {
+                aiDescription: parsed.aiDescription || 'A personal memory captured in photograph.',
+                objects: Array.isArray(parsed.objects) && parsed.objects.length > 0 ? parsed.objects : ['Subject', 'Background'],
+                activities: Array.isArray(parsed.activities) && parsed.activities.length > 0 ? parsed.activities : ['Leisure'],
+                environment: parsed.environment || 'Outdoor',
+                time: parsed.time || 'Daytime',
+              };
+            }
+          } catch (err: any) {
+            const isTransient =
+              err.status === 503 ||
+              err.status === 429 ||
+              err.code === 503 ||
+              err.code === 429 ||
+              (err.message && (err.message.includes('high demand') || err.message.includes('UNAVAILABLE') || err.message.includes('Resource has been exhausted')));
+
+            if (isTransient && attempt === 1) {
+              await new Promise((r) => setTimeout(r, 600));
+              continue;
+            }
+
+            console.warn(`[Gemini Vision] Model ${model} unavailable (${err.message}). Trying next fallback model in chain...`);
+            break; // Switch to next model in VISION_MODELS
+          }
         }
-      } catch (err) {
-        console.warn('Gemini vision analysis failed, using fallback:', err);
       }
     }
 
-    // Fallback metadata for uploaded photo
+    // Context-aware fallback metadata if all models are experiencing transient demand
+    const inferredObjects: string[] = ['Photograph subject', 'Ambient scene'];
+    let inferredActivity = 'Captured memory';
+    if (filename) {
+      const lower = filename.toLowerCase();
+      if (lower.includes('beach') || lower.includes('sea')) inferredObjects.push('Beach', 'Water');
+      if (lower.includes('pool') || lower.includes('swim')) inferredObjects.push('Swimming pool', 'Water');
+      if (lower.includes('party') || lower.includes('bday')) inferredActivity = 'Celebration';
+      if (lower.includes('food') || lower.includes('cafe')) inferredObjects.push('Dish', 'Table');
+    }
+    if (locationHint) {
+      inferredObjects.push(locationHint);
+    }
+
     return {
-      aiDescription: 'Personal photograph captured and indexed with multimodal embedding.',
-      objects: ['Photograph subject', 'Ambient scene'],
-      activities: ['Captured memory'],
+      aiDescription: filename
+        ? `Personal photograph (${filename.replace(/\.[^/.]+$/, '')}) captured and indexed with multimodal embedding.`
+        : 'Personal photograph captured and indexed with multimodal embedding.',
+      objects: inferredObjects,
+      activities: [inferredActivity],
       environment: 'Outdoor',
-      time: 'Afternoon',
+      time: 'Daytime',
     };
   }
 
