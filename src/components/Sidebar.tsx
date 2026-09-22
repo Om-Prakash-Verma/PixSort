@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   HardDrive,
   Database,
+  Presentation,
 } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 
@@ -21,6 +22,7 @@ interface SidebarProps {
   trashCount: number;
   albumsCount: number;
   systemStatus: SystemStatus | null;
+  onOpenPresentation?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   trashCount,
   albumsCount,
   systemStatus,
+  onOpenPresentation,
 }) => {
   const navItems = [
     { id: 'photos' as ActiveTab, label: 'Photos', icon: Image },
@@ -75,6 +78,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })}
+        {/* Project Presentation Deck Shortcut */}
+        {onOpenPresentation && (
+          <div className="pt-2">
+            <button
+              onClick={onOpenPresentation}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold neo-btn text-purple-700 hover:text-purple-900 transition-all border border-purple-200/50"
+              title="Open Project Presentation Deck (/presentation)"
+            >
+              <div className="flex items-center gap-2.5">
+                <Presentation className="w-4 h-4 text-purple-600" />
+                <span>Project Deck</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold">
+                PPT
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Google Cloud Services Architecture Status Card */}

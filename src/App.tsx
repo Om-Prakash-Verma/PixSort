@@ -7,6 +7,7 @@ import { UploadModal } from './components/UploadModal.js';
 import { AlbumsView } from './components/AlbumsView.js';
 import { ArchitectureInspectorModal } from './components/ArchitectureInspectorModal.js';
 import { SimilarPhotosModal } from './components/SimilarPhotosModal.js';
+import { PresentationDeck } from './components/presentation/PresentationDeck.js';
 import { Photo, Album, SearchResponse, SystemStatus } from './types.js';
 import { ArrowLeft, RefreshCw, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 
@@ -15,6 +16,14 @@ export default function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+
+  // Presentation Deck Mode state
+  const [isPresentationMode, setIsPresentationMode] = useState<boolean>(() => {
+    return (
+      typeof window !== 'undefined' &&
+      (window.location.pathname === '/presentation' || window.location.hash === '#/presentation')
+    );
+  });
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,6 +116,27 @@ export default function App() {
     loadAlbums();
     loadSystemStatus();
   }, [loadPhotos, loadAlbums, loadSystemStatus]);
+
+  // Sync presentation mode with browser URL and history
+  useEffect(() => {
+    const handlePopState = () => {
+      const isPres =
+        window.location.pathname === '/presentation' || window.location.hash === '#/presentation';
+      setIsPresentationMode(isPres);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleOpenPresentation = () => {
+    window.history.pushState(null, '', '/presentation');
+    setIsPresentationMode(true);
+  };
+
+  const handleExitPresentation = () => {
+    window.history.pushState(null, '', '/');
+    setIsPresentationMode(false);
+  };
 
   // Execute Natural Language Search via Gemini Embedding 2 + Vertex AI Vector Search
   const handleExecuteSearch = async (query: string) => {
@@ -277,6 +307,10 @@ export default function App() {
   // Counts for sidebar badges
   const favoritesCount = photos.filter((p) => p.isFavorite && !p.isTrash).length;
 
+  if (isPresentationMode) {
+    return <PresentationDeck onExit={handleExitPresentation} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#EEF2F6] text-slate-800 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* Toast Notification */}
@@ -295,6 +329,7 @@ export default function App() {
         onClearSearch={handleClearSearch}
         onOpenUpload={() => setShowUploadModal(true)}
         onOpenInspector={() => setShowInspectorModal(true)}
+        onOpenPresentation={handleOpenPresentation}
         systemStatus={systemStatus}
         isSearching={isSearching}
       />
@@ -313,6 +348,7 @@ export default function App() {
           trashCount={0}
           albumsCount={albums.length}
           systemStatus={systemStatus}
+          onOpenPresentation={handleOpenPresentation}
         />
 
         {/* Center Gallery & Content */}

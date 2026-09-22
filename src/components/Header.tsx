@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers } from 'lucide-react';
+import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers, Presentation } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onClearSearch: () => void;
   onOpenUpload: () => void;
   onOpenInspector: () => void;
+  onOpenPresentation: () => void;
   systemStatus: SystemStatus | null;
   isSearching: boolean;
 }
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   onClearSearch,
   onOpenUpload,
   onOpenInspector,
+  onOpenPresentation,
   systemStatus,
   isSearching,
 }) => {
@@ -71,12 +73,12 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-lg text-slate-800 tracking-tight">Photos</span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-              AI Search
+            <span className="font-bold text-lg text-slate-800 tracking-tight">pix sort</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+              Auto-Processing
             </span>
           </div>
-          <p className="text-xs text-slate-500 hidden sm:block">Powered by Gemini Multimodal Embeddings</p>
+          <p className="text-xs text-slate-500 hidden sm:block">Image Upload & Auto-Processing • Gemini AI</p>
         </div>
       </div>
 
@@ -136,6 +138,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Header Actions */}
       <div className="flex items-center gap-2.5 shrink-0">
+        <button
+          onClick={onOpenPresentation}
+          className="p-2.5 rounded-2xl neo-btn text-purple-700 hover:text-purple-900 transition-colors flex items-center gap-2 text-xs font-semibold"
+          title="Open Project Presentation Deck (/presentation)"
+        >
+          <Presentation className="w-4 h-4 text-purple-600" />
+          <span className="hidden lg:inline">Deck / PPT</span>
+        </button>
+
         <button
           onClick={onOpenInspector}
           className="p-2.5 rounded-2xl neo-btn text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2 text-xs font-semibold"
