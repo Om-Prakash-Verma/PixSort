@@ -454,7 +454,8 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Google AI Photo Search server running at http://0.0.0.0:${PORT}`);
+    console.log(`\n🚀 Google AI Photo Search server is ready!`);
+    console.log(`👉 Open your browser at: http://localhost:${PORT}\n`);
   });
 }
 
