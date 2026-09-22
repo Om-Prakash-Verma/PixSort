@@ -33,16 +33,19 @@ const CONCEPT_CLUSTERS: Record<string, string[]> = {
   friends: ['friends', 'hangout', 'night out', 'rooftop', 'party', 'laughing', 'drinks', 'friendship', 'board game', 'outdoor party', 'social', 'celebrating'],
 };
 
-// Resilient chain of vision models to handle transient 503/429 high demand spikes
-const VISION_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+// Resilient chain of vision models
+const VISION_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash'];
 
 export class GeminiAIService {
   private client: GoogleGenAI | null = null;
-  private hasKey: boolean = false;
+  private cachedKey: string | null = null;
 
-  constructor() {
+  private getClient(): GoogleGenAI | null {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
+      return null;
+    }
+    if (!this.client || this.cachedKey !== apiKey) {
       try {
         this.client = new GoogleGenAI({
           apiKey,
@@ -52,25 +55,30 @@ export class GeminiAIService {
             },
           },
         });
-        this.hasKey = true;
+        this.cachedKey = apiKey;
+        console.log('[Gemini AI] Initialized client with active API key.');
       } catch (err) {
-        console.warn('Gemini client initialization warning:', err);
+        console.warn('[Gemini AI] Initialization warning:', err);
+        return null;
       }
     }
+    return this.client;
   }
 
   getHasKey(): boolean {
-    return this.hasKey;
+    const apiKey = process.env.GEMINI_API_KEY;
+    return Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey.trim() !== '');
   }
 
   /**
    * Generates text embedding using Gemini Embedding 2 with retry for transient spikes
    */
   async embedText(text: string): Promise<number[]> {
-    if (this.client && this.hasKey) {
+    const client = this.getClient();
+    if (client) {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const response = await this.client.models.embedContent({
+          const response = await client.models.embedContent({
             model: 'gemini-embedding-2-preview',
             contents: [text],
           });
@@ -91,7 +99,7 @@ export class GeminiAIService {
             await new Promise((r) => setTimeout(r, 600));
             continue;
           }
-          console.warn('Gemini embedContent notice, using semantic vector fallback:', err.message);
+          console.warn('[Gemini Embedding] embedContent notice, using semantic vector fallback:', err.message);
           break;
         }
       }
@@ -104,11 +112,12 @@ export class GeminiAIService {
    * Generates multimodal image embedding using Gemini Embedding 2 with retry
    */
   async embedImage(base64Data: string, mimeType: string = 'image/jpeg'): Promise<number[]> {
-    if (this.client && this.hasKey) {
+    const client = this.getClient();
+    if (client) {
       const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const response = await this.client.models.embedContent({
+          const response = await client.models.embedContent({
             model: 'gemini-embedding-2-preview',
             contents: [
               {
@@ -136,7 +145,7 @@ export class GeminiAIService {
             await new Promise((r) => setTimeout(r, 600));
             continue;
           }
-          console.warn('Gemini embedImage notice, using fallback vector:', err.message);
+          console.warn('[Gemini Embedding] embedImage notice, using fallback vector:', err.message);
           break;
         }
       }
@@ -155,13 +164,16 @@ export class GeminiAIService {
     filename?: string,
     locationHint?: string
   ): Promise<ExtractedPhotoMetadata> {
-    if (this.client && this.hasKey) {
+    const client = this.getClient();
+
+    if (client) {
       const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      console.log(`[Gemini Vision] Initiating vision analysis for photo "${filename || 'unnamed'}"...`);
 
       for (const model of VISION_MODELS) {
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
-            const response = await this.client.models.generateContent({
+            const response = await client.models.generateContent({
               model,
               contents: {
                 parts: [
@@ -172,7 +184,7 @@ export class GeminiAIService {
                     },
                   },
                   {
-                    text: 'Analyze this personal photo. Do NOT identify specific individual people or face recognition. Provide a structured summary of what is seen in the image including scene description, objects, activities, environment (Indoor/Outdoor/Mixed), and time of day (Morning/Afternoon/Evening/Night/Golden Hour).',
+                    text: 'Analyze this photo or image. Describe accurately what is depicted (e.g. document, student/college card, landscape, indoor/outdoor scene, people, objects, activities, or visual subject). Provide a structured summary with: aiDescription (1-2 clear descriptive sentences), objects (3-8 specific items or elements seen), activities (1-3 actions or themes), environment (Indoor, Outdoor, Campus, Office, Classroom, etc.), and time (Daytime, Evening, Night, Indoor Lighting, etc.). Do not attempt biometric face recognition.',
                   },
                 ],
               },
@@ -194,11 +206,12 @@ export class GeminiAIService {
 
             if (response.text) {
               const parsed = JSON.parse(response.text.trim());
+              console.log(`[Gemini Vision] Success via ${model}: "${parsed.aiDescription}"`);
               return {
-                aiDescription: parsed.aiDescription || 'A personal memory captured in photograph.',
-                objects: Array.isArray(parsed.objects) && parsed.objects.length > 0 ? parsed.objects : ['Subject', 'Background'],
-                activities: Array.isArray(parsed.activities) && parsed.activities.length > 0 ? parsed.activities : ['Leisure'],
-                environment: parsed.environment || 'Outdoor',
+                aiDescription: parsed.aiDescription || 'A personal photograph captured and indexed with multimodal embedding.',
+                objects: Array.isArray(parsed.objects) && parsed.objects.length > 0 ? parsed.objects : ['Subject', 'Visual Elements'],
+                activities: Array.isArray(parsed.activities) && parsed.activities.length > 0 ? parsed.activities : ['Captured memory'],
+                environment: parsed.environment || 'Indoor',
                 time: parsed.time || 'Daytime',
               };
             }
@@ -215,18 +228,24 @@ export class GeminiAIService {
               continue;
             }
 
-            console.warn(`[Gemini Vision] Model ${model} unavailable (${err.message}). Trying next fallback model in chain...`);
+            console.warn(`[Gemini Vision] Model ${model} returned error: ${err.message || err}`);
             break; // Switch to next model in VISION_MODELS
           }
         }
       }
+    } else {
+      console.warn('[Gemini Vision] GEMINI_API_KEY is not set or invalid in environment. Please check your .env file.');
     }
 
-    // Context-aware fallback metadata if all models are experiencing transient demand
+    // Context-aware fallback metadata if key is missing or all models are unavailable
     const inferredObjects: string[] = ['Photograph subject', 'Ambient scene'];
     let inferredActivity = 'Captured memory';
     if (filename) {
       const lower = filename.toLowerCase();
+      if (lower.includes('college') || lower.includes('id') || lower.includes('card')) {
+        inferredObjects.push('Identity card', 'Credentials', 'College document');
+        inferredActivity = 'Identification';
+      }
       if (lower.includes('beach') || lower.includes('sea')) inferredObjects.push('Beach', 'Water');
       if (lower.includes('pool') || lower.includes('swim')) inferredObjects.push('Swimming pool', 'Water');
       if (lower.includes('party') || lower.includes('bday')) inferredActivity = 'Celebration';

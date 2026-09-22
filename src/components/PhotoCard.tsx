@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Sparkles, MapPin, Calendar, Clock, Layers, Loader2 } from 'lucide-react';
+import { Heart, Sparkles, MapPin, Calendar, Clock, Layers, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Photo } from '../types.js';
 
 interface PhotoCardProps {
@@ -16,6 +16,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onFindSimilar,
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const isReady = photo.processingStatus === 'READY';
 
   return (
@@ -25,22 +26,40 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
     >
       {/* Photo Frame Container */}
       <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden bg-slate-200">
-        {!imageLoaded && (
+        {!imageLoaded && !hasError && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-200 animate-pulse">
             <span className="text-xs text-slate-400">Loading photo...</span>
           </div>
         )}
 
-        <img
-          src={photo.thumbnailUrl || photo.url}
-          alt={photo.aiDescription}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onLoad={() => setImageLoaded(true)}
-          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
+        {hasError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300 p-4 text-center">
+            <div className="p-3 rounded-full bg-white/70 shadow-sm mb-2 text-slate-500">
+              <ImageIcon className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-medium text-slate-600 truncate max-w-[90%]">
+              {photo.filename}
+            </span>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {photo.aiDescription ? photo.aiDescription.slice(0, 45) + '...' : 'Uploaded to Cloud'}
+            </span>
+          </div>
+        ) : (
+          <img
+            src={photo.thumbnailUrl || photo.url}
+            alt={photo.aiDescription}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onLoad={() => setImageLoaded(true)}
+            onError={() => {
+              setHasError(true);
+              setImageLoaded(true);
+            }}
+            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
 
         {/* Top Badges Overlay */}
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none">

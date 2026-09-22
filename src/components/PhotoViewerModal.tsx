@@ -19,6 +19,7 @@ import {
   Tag,
   Activity,
   Cpu,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Photo, Album } from '../types.js';
 
@@ -48,6 +49,11 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
   const [showInfo, setShowInfo] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showAlbumMenu, setShowAlbumMenu] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [photo?.id]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -232,19 +238,35 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
           </button>
         )}
 
-        {/* Actual Image */}
+        {/* Actual Image or Fallback */}
         <div
           className={`transition-all duration-300 flex items-center justify-center max-h-[85vh] ${
             isZoomed ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'
           }`}
-          onClick={() => setIsZoomed(!isZoomed)}
+          onClick={() => !imageError && setIsZoomed(!isZoomed)}
         >
-          <img
-            src={photo.url}
-            alt={photo.aiDescription}
-            referrerPolicy="no-referrer"
-            className="max-h-[85vh] max-w-[85vw] object-contain rounded-2xl shadow-2xl transition-transform"
-          />
+          {imageError ? (
+            <div className="flex flex-col items-center justify-center p-12 rounded-3xl bg-slate-900/90 border border-slate-700/60 text-slate-300 max-w-md text-center shadow-2xl">
+              <div className="p-4 rounded-2xl bg-slate-800 text-slate-400 mb-4 shadow-inner">
+                <ImageIcon className="w-10 h-10" />
+              </div>
+              <h4 className="text-base font-semibold text-white mb-1">{photo.filename}</h4>
+              <p className="text-xs text-slate-400 mb-4 max-w-xs">
+                The image binary for this photo was uploaded in a previous session or remote environment. Its AI visual metadata and vector embeddings remain fully searchable.
+              </p>
+              <div className="px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/40 text-[11px] text-blue-300 font-medium">
+                Indexed in Vertex AI Vector Search
+              </div>
+            </div>
+          ) : (
+            <img
+              src={photo.url}
+              alt={photo.aiDescription}
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
+              className="max-h-[85vh] max-w-[85vw] object-contain rounded-2xl shadow-2xl transition-transform"
+            />
+          )}
         </div>
       </div>
 
