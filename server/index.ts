@@ -6,6 +6,7 @@ import { PORT, UPLOADS_DIR, DIST_PATH, isProduction } from './config.js';
 import { dbService } from './services/database.js';
 import { aiService } from './services/ai.js';
 import { vectorSearchService } from './services/vectorSearch.js';
+import { semanticSearchEngine } from './services/semanticSearch.js';
 
 // Route modules
 import { mediaRouter } from './routes/media.js';
@@ -20,7 +21,7 @@ async function bootstrapVectorIndex() {
 
   for (const photo of photos) {
     const textContext = `${photo.aiDescription} ${photo.objects.join(' ')} ${photo.activities.join(' ')} ${photo.environment} ${photo.time} ${photo.location}`;
-    const vector = await aiService.embedText(textContext);
+    const vector = semanticSearchEngine.generateDenseVector(textContext);
 
     await vectorSearchService.upsertVector({
       id: photo.id,
@@ -35,7 +36,7 @@ async function bootstrapVectorIndex() {
       },
     });
   }
-  console.log(`[System] Successfully indexed ${vectorSearchService.getIndexedCount()} photos into Vertex AI Vector Search.`);
+  console.log(`[System] Successfully indexed ${vectorSearchService.getIndexedCount()} photos into Vertex AI Vector Search (0 API calls used).`);
 }
 
 export async function createApp() {

@@ -58,6 +58,8 @@ export interface SystemStatus {
   readyPhotosCount: number;
   processingCount: number;
   cloudStorageItems: number;
+  cloudStorageConnected?: boolean;
+  cloudStorageBucket?: string;
   firestoreConnected?: boolean;
   firebaseProjectId?: string;
 }

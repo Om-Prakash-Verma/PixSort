@@ -98,12 +98,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Google Cloud Services Architecture Status Card */}
+      {/* Google Cloud Services & Search Architecture Status Card */}
       <div className="mt-8 p-3.5 rounded-2xl neo-raised border border-white/60 space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            Google AI Services
+            AI & Search Engine
           </span>
           <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -113,8 +113,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="space-y-1.5 text-[11px] text-slate-600 pt-1 border-t border-slate-200/60">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">Multimodal AI</span>
-            <span className="font-medium text-slate-700">Gemini Embedding 2</span>
+            <span className="text-slate-500">Search Engine</span>
+            <span className="font-semibold text-emerald-700 flex items-center gap-1">
+              Local Semantic
+              <span className="text-[9px] font-mono bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-bold">
+                0 API Calls
+              </span>
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Search Latency</span>
+            <span className="font-mono text-emerald-700 font-bold">~3 ms ($0 cost)</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Ingestion Vision</span>
+            <span className="font-medium text-slate-700">Gemini 2.5 Flash</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Vector Index</span>
