@@ -69,20 +69,12 @@ export class GoogleCloudStorageService {
     const base64Content = dataBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Content, 'base64');
 
-    // 1. Always keep local cached copy for zero-latency local retrieval and fallback
-    try {
-      fs.writeFileSync(localFilePath, buffer);
-    } catch (e) {
-      console.warn('[Storage] Local write notice:', e);
-    }
-
-    const localUrl = `/uploads/${cleanFilename}`;
     const defaultStoragePath = `gs://${this.bucketName}/photos/${cleanFilename}`;
 
-    // 2. Upload directly to Google Cloud Storage if connected
+    // 1. Upload directly from memory to Google Cloud Storage (No local disk pollution)
     if (this.firebaseStorage) {
       try {
-        console.log(`[Cloud Storage] Uploading ${cleanFilename} (${buffer.length} bytes) to Google Cloud Storage...`);
+        console.log(`[Cloud Storage] Streaming ${cleanFilename} (${buffer.length} bytes) directly from memory to Google Cloud Storage...`);
         const fileRef = storageRef(this.firebaseStorage, `photos/${cleanFilename}`);
         const metadata = {
           contentType: mimeType,
@@ -98,7 +90,7 @@ export class GoogleCloudStorageService {
         const snapshot = await uploadBytes(fileRef, uint8Array, metadata);
         const downloadUrl = await getDownloadURL(snapshot.ref);
 
-        console.log(`[Cloud Storage] Successfully uploaded to Google Cloud Storage CDN: ${downloadUrl.slice(0, 70)}...`);
+        console.log(`[Cloud Storage] Upload complete: ${downloadUrl.slice(0, 70)}...`);
 
         return {
           storagePath: defaultStoragePath,
@@ -107,10 +99,18 @@ export class GoogleCloudStorageService {
           thumbnailUrl: downloadUrl, // Cloud Storage CDN delivers optimized high-speed thumbnails
         };
       } catch (cloudErr: any) {
-        console.warn(`[Cloud Storage] Cloud bucket upload notice (${cloudErr?.message || cloudErr}). Using local storage URI.`);
+        console.warn(`[Cloud Storage] Cloud bucket upload failed (${cloudErr?.message || cloudErr}). Falling back to local disk buffer.`);
       }
     }
 
+    // 2. Fallback to local storage ONLY if Cloud Storage is unavailable or offline
+    try {
+      fs.writeFileSync(localFilePath, buffer);
+    } catch (e) {
+      console.warn('[Storage] Local write fallback notice:', e);
+    }
+
+    const localUrl = `/uploads/${cleanFilename}`;
     return {
       storagePath: defaultStoragePath,
       url: localUrl,
