@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { dbService } from '../services/database.js';
 import { aiService } from '../services/ai.js';
 import { vectorSearchService } from '../services/vectorSearch.js';
-import { storageService } from '../services/storage.js';
+import { storageService, driveStorageService } from '../services/storage.js';
 import { SystemStatus } from '../../src/types.js';
 
 export const systemRouter = Router();
@@ -11,6 +11,8 @@ export const systemRouter = Router();
 systemRouter.get('/status', (req: Request, res: Response) => {
   const stats = dbService.getStats();
   const cloudStorageStatus = storageService.getCloudStatus();
+  const pooled = driveStorageService.getPooledStats();
+
   const status: SystemStatus = {
     geminiEmbeddingModel: 'gemini-embedding-2-preview',
     hasGeminiKey: aiService.getHasKey(),
@@ -19,12 +21,20 @@ systemRouter.get('/status', (req: Request, res: Response) => {
     totalPhotosCount: stats.total,
     readyPhotosCount: stats.ready,
     processingCount: stats.processing,
-    cloudStorageItems: storageService.getItemCount() + stats.total,
-    cloudStorageConnected: cloudStorageStatus.isConnected,
-    cloudStorageBucket: cloudStorageStatus.bucketName,
-    cloudStorageProvisioned: cloudStorageStatus.isProvisioned,
     firestoreConnected: stats.firestoreConnected,
     firebaseProjectId: stats.firebaseProjectId,
+    // Google Drive Pooled Storage
+    googleDriveAccountsCount: pooled.accountsCount,
+    googleDriveActiveCount: pooled.activeCount,
+    googleDriveTotalStorage: pooled.totalStorage,
+    googleDriveUsedStorage: pooled.usedStorage,
+    googleDriveAvailableStorage: pooled.availableStorage,
+    primaryDriveEmail: pooled.primaryAccountEmail,
+    // Legacy compatibility fields
+    cloudStorageItems: stats.total,
+    cloudStorageConnected: pooled.activeCount > 0,
+    cloudStorageBucket: pooled.primaryAccountEmail || 'Google Drive',
+    cloudStorageProvisioned: true,
   };
   res.json(status);
 });

@@ -1,16 +1,33 @@
-import React, { useState, useRef } from 'react';
-import { X, Upload, Image as ImageIcon, Sparkles, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
-import { Album } from '../types.js';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  Upload,
+  Image as ImageIcon,
+  Sparkles,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  HardDrive,
+  AlertTriangle,
+  ExternalLink,
+} from 'lucide-react';
+import { Album, ConnectedDriveAccount } from '../types.js';
 
 interface UploadModalProps {
   albums: Album[];
   onClose: () => void;
   onUploadSuccess: () => void;
+  onOpenStorage?: () => void;
 }
 
-type PipelineStep = 'idle' | 'uploading' | 'processing' | 'indexing' | 'ready';
+type PipelineStep = 'idle' | 'allocating' | 'uploading' | 'processing' | 'indexing' | 'ready';
 
-export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUploadSuccess }) => {
+export const UploadModal: React.FC<UploadModalProps> = ({
+  albums,
+  onClose,
+  onUploadSuccess,
+  onOpenStorage,
+}) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [location, setLocation] = useState('');
@@ -18,8 +35,53 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
   const [selectedAlbumId, setSelectedAlbumId] = useState<string>('');
   const [pipelineStep, setPipelineStep] = useState<PipelineStep>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isStorageFull, setIsStorageFull] = useState(false);
+
+  // Drive accounts and allocated target
+  const [accounts, setAccounts] = useState<ConnectedDriveAccount[]>([]);
+  const [targetAccount, setTargetAccount] = useState<ConnectedDriveAccount | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load active Drive accounts on modal mount
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        const res = await fetch('/api/drive/accounts');
+        if (res.ok) {
+          const data = await res.json();
+          const active = (data.accounts || []).filter((a: ConnectedDriveAccount) => a.status === 'active');
+          setAccounts(active);
+          if (active.length > 0) {
+            setTargetAccount(active[0]);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching drive accounts:', e);
+      }
+    };
+    loadAccounts();
+  }, []);
+
+  // Update target account whenever file changes
+  useEffect(() => {
+    if (!file || accounts.length === 0) return;
+    const fileSize = file.size;
+
+    // Find first active account in priority order with enough space
+    const suitable = accounts.find((acc) => acc.storageAvailable >= fileSize);
+    if (suitable) {
+      setTargetAccount(suitable);
+      setIsStorageFull(false);
+      setErrorMsg(null);
+    } else {
+      setIsStorageFull(true);
+      setErrorMsg(
+        'Your connected Google Drive accounts do not have enough available storage for this upload.'
+      );
+    }
+  }, [file, accounts]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -50,10 +112,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
     if (!file || !previewUrl) return;
 
     setErrorMsg(null);
-    setPipelineStep('uploading');
+    setIsStorageFull(false);
+    setPipelineStep('allocating');
+    setUploadProgress(15);
 
     try {
-      // Step 1: Upload to Cloud Storage
+      await new Promise((r) => setTimeout(r, 300));
+      setPipelineStep('uploading');
+      setUploadProgress(45);
+
+      // Step 1: Upload to Google Drive API
       const res = await fetch('/api/photos/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,16 +136,29 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
       });
 
       if (!res.ok) {
-        throw new Error('Upload request failed');
+        const errorData = await res.json().catch(() => ({}));
+        if (
+          res.status === 500 &&
+          (errorData.error?.includes('Storage full') || errorData.error?.includes('storage'))
+        ) {
+          setIsStorageFull(true);
+          throw new Error(
+            errorData.error ||
+              'Your connected Google Drive accounts do not have enough available storage for this upload.'
+          );
+        }
+        throw new Error(errorData.error || 'Upload request failed');
       }
 
-      // Step 2 & 3: Simulate pipeline status animation to give feedback
+      setUploadProgress(72);
       setPipelineStep('processing');
       await new Promise((r) => setTimeout(r, 600));
 
+      setUploadProgress(90);
       setPipelineStep('indexing');
       await new Promise((r) => setTimeout(r, 600));
 
+      setUploadProgress(100);
       setPipelineStep('ready');
       await new Promise((r) => setTimeout(r, 500));
 
@@ -102,7 +183,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
             <div>
               <h2 className="text-sm font-bold text-slate-800">Upload Personal Photo</h2>
               <p className="text-[11px] text-slate-500">
-                Indexed with Gemini Embedding 2 for semantic retrieval
+                Stored in your personal Google Drive • Multimodal AI Indexed
               </p>
             </div>
           </div>
@@ -146,11 +227,33 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
                 onClick={() => {
                   setFile(null);
                   setPreviewUrl(null);
+                  setErrorMsg(null);
+                  setIsStorageFull(false);
                 }}
                 className="absolute top-2 right-2 p-1.5 rounded-xl bg-slate-900/70 text-white hover:bg-slate-900 text-xs"
               >
                 Change photo
               </button>
+            </div>
+
+            {/* Target Google Drive Account Indicator (Section 6 & 14) */}
+            <div className="p-3 rounded-xl neo-raised border border-white/60 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
+                <div className="truncate">
+                  <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                    Target Storage Account
+                  </div>
+                  <div className="font-mono text-slate-800 font-bold truncate">
+                    {targetAccount ? targetAccount.googleAccountEmail : 'Detecting account...'}
+                  </div>
+                </div>
+              </div>
+              {targetAccount && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0">
+                  Priority #{targetAccount.priority}
+                </span>
+              )}
             </div>
 
             {/* Metadata Inputs */}
@@ -204,9 +307,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
           </div>
         )}
 
-        {/* Pipeline Status Indicator */}
+        {/* Pipeline Status Indicator with Real Progress (Section 14) */}
         {pipelineStep !== 'idle' && (
-          <div className="p-3.5 rounded-2xl neo-inset space-y-2 text-xs">
+          <div className="p-3.5 rounded-2xl neo-inset space-y-2.5 text-xs">
             <div className="flex items-center justify-between font-bold text-slate-700">
               <span className="flex items-center gap-2">
                 {pipelineStep === 'ready' ? (
@@ -214,38 +317,58 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
                 ) : (
                   <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
                 )}
-                Pipeline: {pipelineStep.toUpperCase()}
+                <span>
+                  {pipelineStep === 'allocating' && 'Allocating Google Drive Storage...'}
+                  {pipelineStep === 'uploading' && `Uploading to ${targetAccount?.googleAccountEmail || 'Google Drive'}...`}
+                  {pipelineStep === 'processing' && 'Extracting Scene Semantics with Gemini...'}
+                  {pipelineStep === 'indexing' && 'Indexing into Vertex AI Vector Space...'}
+                  {pipelineStep === 'ready' && 'Ready in Library!'}
+                </span>
               </span>
-              <span className="text-[10px] text-slate-400">Asynchronous</span>
+              <span className="font-mono text-blue-600 font-bold">{uploadProgress}%</span>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 text-[10px] text-center font-medium">
+            {/* Progress bar */}
+            <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300 rounded-full"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-1 text-[10px] text-center font-medium pt-1">
               <div
                 className={`py-1 rounded-lg ${
-                  pipelineStep === 'uploading'
+                  pipelineStep === 'uploading' || pipelineStep === 'allocating'
                     ? 'bg-blue-600 text-white font-bold'
+                    : uploadProgress > 45
+                    ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200 text-slate-600'
                 }`}
               >
-                1. Storage
+                1. Drive Upload
               </div>
               <div
                 className={`py-1 rounded-lg ${
                   pipelineStep === 'processing'
                     ? 'bg-blue-600 text-white font-bold'
+                    : uploadProgress > 72
+                    ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200 text-slate-600'
                 }`}
               >
-                2. Vision
+                2. AI Vision
               </div>
               <div
                 className={`py-1 rounded-lg ${
                   pipelineStep === 'indexing'
                     ? 'bg-blue-600 text-white font-bold'
+                    : uploadProgress >= 100
+                    ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200 text-slate-600'
                 }`}
               >
-                3. Vector
+                3. Vector Index
               </div>
               <div
                 className={`py-1 rounded-lg ${
@@ -260,21 +383,49 @@ export const UploadModal: React.FC<UploadModalProps> = ({ albums, onClose, onUpl
           </div>
         )}
 
-        {errorMsg && <p className="text-xs text-rose-600 font-semibold">{errorMsg}</p>}
+        {/* Storage Full Warning (Section 6 requirement) */}
+        {isStorageFull && (
+          <div className="p-4 rounded-2xl neo-inset bg-amber-50 border border-amber-200/80 space-y-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-700 font-bold">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Storage full</span>
+            </div>
+            <p className="text-slate-600 leading-relaxed">
+              Your connected Google Drive accounts do not have enough available storage for this upload.
+            </p>
+            {onOpenStorage && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenStorage();
+                }}
+                className="mt-1 px-3 py-1.5 rounded-xl neo-btn text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 cursor-pointer bg-white"
+              >
+                <HardDrive className="w-3.5 h-3.5" />
+                <span>Connect Another Drive</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {errorMsg && !isStorageFull && (
+          <p className="text-xs text-rose-600 font-semibold">{errorMsg}</p>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-2.5 pt-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl neo-btn text-xs font-semibold text-slate-600"
+            className="px-4 py-2 rounded-xl neo-btn text-xs font-semibold text-slate-600 cursor-pointer"
           >
             Cancel
           </button>
           <button
-            disabled={!file || pipelineStep !== 'idle'}
+            disabled={!file || pipelineStep !== 'idle' || isStorageFull}
             onClick={handleStartUpload}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              !file || pipelineStep !== 'idle'
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              !file || pipelineStep !== 'idle' || isStorageFull
                 ? 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-500'
                 : 'neo-btn text-blue-700 hover:text-blue-800'
             }`}

@@ -317,9 +317,9 @@ export const Slide2Pipeline: React.FC = () => {
     {
       num: '01',
       title: 'You Upload a Photo',
-      tech: 'Express Multipart & WebP Thumbnail',
-      simple: 'Drop any JPEG, PNG, or WebP. The app creates a lightweight preview instantly so there is zero waiting time.',
-      analogy: 'Like scanning a photo into an album preview.',
+      tech: 'Google Drive API (Auto-Allocated)',
+      simple: 'Upload any photo. The system allocates storage across your connected Google Drive accounts with automatic failover and creates instant previews.',
+      analogy: 'Like storing photos safely in your own personal cloud lockbox.',
       latency: '~35 ms',
     },
     {
@@ -733,30 +733,30 @@ export const Slide6TechStack: React.FC = () => {
     {
       tier: 'TIER 1',
       title: 'User Interface (The Face)',
-      tech: 'React 19 · TypeScript · Tailwind CSS',
+      tech: 'Next.js / React 19 · TypeScript · Tailwind CSS',
       role: 'What the user sees and interacts with.',
-      details: 'Clean responsive photo gallery, search bar with instant feedback, image detail inspect modal, and full keyboard navigation (arrows, spacebar, esc).',
+      details: 'Clean responsive photo gallery, search bar with instant feedback, connected storage dashboard, and full keyboard navigation (arrows, spacebar, esc).',
     },
     {
       tier: 'TIER 2',
-      title: 'Application Server (The Conductor)',
-      tech: 'Node.js 20 · Express · Multer',
-      role: 'Coordinates requests and handles file streams.',
-      details: 'Receives uploaded images, verifies safety, creates WebP thumbnails for speed, and communicates seamlessly with Google AI endpoints.',
+      title: 'Authentication & Server (The Conductor)',
+      tech: 'Node.js 20 · Express · Firebase Auth · Google OAuth',
+      role: 'Handles user sessions and orchestrates cloud flows.',
+      details: 'Authorizes connected Google Drive accounts via secure OAuth 2.0 (drive.file scope), coordinates uploads with automatic failover, and handles image streams.',
     },
     {
       tier: 'TIER 3',
-      title: 'Dual AI & Search Engine (The Brain)',
-      tech: 'Gemini 2.5 Flash + Local Semantic Hybrid Engine',
-      role: 'Combines cloud vision intelligence with local zero-API search.',
-      details: 'Gemini 2.5 Flash extracts rich scene narratives once at ingestion. Our local semantic engine processes search queries completely offline with 0 API calls, saving 100% of user API budget.',
+      title: 'Multimodal AI & Vector Search (The Brain)',
+      tech: 'Gemini 2.5 Flash · Gemini Embeddings · Vertex AI',
+      role: 'Vision comprehension and high-dimensional semantic search.',
+      details: 'Gemini extracts rich scene stories at ingestion. Gemini Embeddings & Vertex AI vector search calculate continuous cosine similarity to find memories by conversational meaning.',
     },
     {
       tier: 'TIER 4',
-      title: 'Cloud Database (The Vault)',
-      tech: 'Google Cloud Firestore NoSQL',
-      role: 'Safely stores and persists all records.',
-      details: 'Stores photo metadata, albums, user tags, and coordinates. Ensures data is preserved safely across restarts and sessions with ACID reliability.',
+      title: 'Pooled Storage & Metadata (The Vault)',
+      tech: 'Google Drive API (Multi-Account) + Firestore NoSQL',
+      role: 'Decentralized personal storage with centralized indexing.',
+      details: 'Photos remain in user\'s own Google Drive accounts with automatic capacity failover. Firestore maintains rich document metadata, album tags, and Drive file pointers.',
     },
   ];
 
@@ -767,12 +767,12 @@ export const Slide6TechStack: React.FC = () => {
         <div className={`text-[11px] font-mono font-bold uppercase tracking-wider ${
           isDark ? 'text-blue-400' : 'text-blue-600'
         }`}>
-          06 // System Architecture
+          06 // Technology & Cloud Services
         </div>
         <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${
           isDark ? 'text-white' : 'text-slate-900'
         }`}>
-          The 4-Layer Engine Powering PixSort
+          The Modern Cloud Stack Powering PixSort
         </h2>
       </div>
 
@@ -811,18 +811,18 @@ export const Slide6TechStack: React.FC = () => {
         ))}
       </div>
 
-      {/* Compliance Bar */}
+      {/* Cloud Services Compliance Bar */}
       <div className={`p-3 rounded-xl border text-xs font-mono text-center ${
         isDark ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
       }`}>
-        Strictly adhering to Google AI SDK standards · TypeScript type safety · Modern production architecture
+        Next.js / React • TypeScript • Firebase Authentication • Firestore • Google Drive API • Gemini • Gemini Embeddings • Vertex AI / Vector Search
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   Slide 7: System Data Flow (How Data Moves)
+   Slide 7: System Topology & Data Flow
    ========================================================= */
 export const Slide7Architecture: React.FC = () => {
   const { isDark } = useSlideTheme();
@@ -834,107 +834,121 @@ export const Slide7Architecture: React.FC = () => {
         <div className={`text-[11px] font-mono font-bold uppercase tracking-wider ${
           isDark ? 'text-blue-400' : 'text-blue-600'
         }`}>
-          07 // Data Flow & Lifecycle
+          07 // System Architecture & Multi-Drive Topology
         </div>
         <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${
           isDark ? 'text-white' : 'text-slate-900'
         }`}>
-          How Data Moves: Uploading vs. Searching
+          Multi-Account Google Drive Storage Pool & AI Pipeline
         </h2>
       </div>
 
-      {/* 2 Clear Flows (Ingestion vs Retrieval) */}
-      <div className="my-auto py-2 space-y-4">
-        {/* Upload Flow */}
-        <div className={`p-4 rounded-2xl border space-y-2.5 ${
+      {/* Visual Multi-Drive Storage Pool Diagram */}
+      <div className="my-auto py-2 space-y-3.5">
+        {/* The End-to-End Hierarchy Flow */}
+        <div className={`p-4 rounded-2xl border space-y-3 ${
           isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
         }`}>
           <div className="flex items-center justify-between text-xs font-mono">
             <span className={`font-bold uppercase ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-              Flow A: When You Upload a Photo (The Storage Path)
+              End-to-End Pipeline: From User to Multi-Drive & AI
             </span>
-            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Asynchronous</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
+              Automatic Storage Failover
+            </span>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'
-            }`}>
-              <div className="font-bold">1. File Pick</div>
-              <div className="text-[10px] text-slate-500">Image upload</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center font-mono text-[11px]">
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
+              <div className="font-bold text-slate-800">1. User</div>
+              <div className="text-[9px] text-slate-500">Selects photo</div>
             </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'
-            }`}>
-              <div className="font-bold">2. Gemini 2.5</div>
-              <div className="text-[10px] text-slate-500">Extracts scene story</div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
+              <div className="font-bold text-slate-800">2. App</div>
+              <div className="text-[9px] text-slate-500">React / Next.js</div>
             </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'
-            }`}>
-              <div className="font-bold">3. Vectorizer</div>
-              <div className="text-[10px] text-slate-500">3072-D coordinate</div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
+              <div className="font-bold text-slate-800">3. OAuth</div>
+              <div className="text-[9px] text-slate-500">Google OAuth 2.0</div>
             </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'
-            }`}>
-              <div className="font-bold">4. Cloud DB</div>
-              <div className="text-[10px] text-slate-500">Saved to Firestore</div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-indigo-950/40 border-indigo-800' : 'bg-indigo-50 border-indigo-200'}`}>
+              <div className="font-bold text-indigo-700">4. Drives Pool</div>
+              <div className="text-[9px] text-indigo-500">Drive A / B / C</div>
             </div>
-          </div>
-          <div className="text-xs text-slate-500">
-            <em>Summary:</em> The user gets an immediate preview while the AI indexes the photo in the background.
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-indigo-950/40 border-indigo-800' : 'bg-indigo-50 border-indigo-200'}`}>
+              <div className="font-bold text-indigo-700">5. Allocation</div>
+              <div className="text-[9px] text-indigo-500">Quota & Failover</div>
+            </div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
+              <div className="font-bold text-slate-800">6. Gemini</div>
+              <div className="text-[9px] text-slate-500">Vision Analysis</div>
+            </div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
+              <div className="font-bold text-slate-800">7. Vectors</div>
+              <div className="text-[9px] text-slate-500">Vertex AI Search</div>
+            </div>
+            <div className={`p-2 rounded-xl border ${isDark ? 'bg-emerald-950/40 border-emerald-800' : 'bg-emerald-50 border-emerald-200'}`}>
+              <div className="font-bold text-emerald-700">8. Firestore</div>
+              <div className="text-[9px] text-emerald-600">Unified Metadata</div>
+            </div>
           </div>
         </div>
 
-        {/* Search Flow */}
+        {/* Visual Drive Storage Pool Representation */}
         <div className={`p-4 rounded-2xl border space-y-2.5 ${
           isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
         }`}>
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className={`font-bold uppercase ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-              Flow B: When You Search a Memory (Zero-API Instant Retrieval Path)
+            <span className={`font-bold uppercase ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
+              Multi-Account Pooled Storage Architecture
             </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-              0 API Calls · &lt; 5ms SLA
-            </span>
+            <span className="text-[10px] text-slate-400">One Unified Photo Library</span>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/70 border-emerald-200'
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+            <div className={`p-3 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/50 border-blue-200'
             }`}>
-              <div className="font-bold">1. Query</div>
-              <div className="text-[10px] text-slate-500">"Puppy playing"</div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800">🟢 Drive A (Primary)</span>
+                <span className="text-[10px] px-1.5 rounded bg-blue-100 text-blue-700 font-bold">14.2 / 15 GB</span>
+              </div>
+              <div className="text-[10px] text-slate-500">om.example@gmail.com</div>
+              <div className="text-[10px] text-amber-700 font-semibold">94.7% Used ➔ Near Quota Limit</div>
             </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/70 border-emerald-200'
+
+            <div className={`p-3 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/50 border-emerald-200'
             }`}>
-              <div className="font-bold">2. Local Vectorizer</div>
-              <div className="text-[10px] text-slate-500">768-D Space (0 API)</div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800">🟢 Drive B (Backup)</span>
+                <span className="text-[10px] px-1.5 rounded bg-emerald-100 text-emerald-700 font-bold">3.4 / 15 GB</span>
+              </div>
+              <div className="text-[10px] text-slate-500">om.backup@gmail.com</div>
+              <div className="text-[10px] text-emerald-700 font-semibold">22.6% Used ➔ Auto Failover Target</div>
             </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/70 border-emerald-200'
+
+            <div className={`p-3 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}>
-              <div className="font-bold">3. Hybrid Fusion</div>
-              <div className="text-[10px] text-slate-500">Cosine + Concept Overlap</div>
-            </div>
-            <div className={`p-2.5 rounded-xl border ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/70 border-emerald-200'
-            }`}>
-              <div className="font-bold">4. Render</div>
-              <div className="text-[10px] text-slate-500">Photos Appear (3ms)</div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800">🟢 Drive C (Archive)</span>
+                <span className="text-[10px] px-1.5 rounded bg-slate-200 text-slate-700 font-bold">0.8 / 15 GB</span>
+              </div>
+              <div className="text-[10px] text-slate-500">om.archive@gmail.com</div>
+              <div className="text-[10px] text-slate-600 font-semibold">5.3% Used ➔ Reserve Storage Pool</div>
             </div>
           </div>
-          <div className="text-xs text-slate-500">
-            <em>Summary:</em> Search runs completely locally with 0 external API calls ($0 budget consumed), executing in ~3 milliseconds while delivering 95%+ precision.
+
+          <div className="text-xs text-slate-500 pt-1">
+            <em>UX Principle:</em> Complexity is completely hidden from the user. All photos from Drive A, Drive B, and Drive C are indexed together into a single unified search experience.
           </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className={`text-xs font-mono text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-        Slide 07 of 11 · Complete Read/Write Data Lifecycle
+        Slide 07 of 11 · Decentralized Personal Drive Storage with Centralized AI Search
       </div>
     </div>
   );

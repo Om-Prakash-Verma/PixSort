@@ -14,6 +14,7 @@ import { photosRouter } from './routes/photos.js';
 import { searchRouter } from './routes/search.js';
 import { albumsRouter } from './routes/albums.js';
 import { systemRouter } from './routes/system.js';
+import { driveRouter } from './routes/drive.js';
 
 async function bootstrapVectorIndex() {
   console.log('[System] Initializing Vertex AI Vector Search index from Firestore metadata...');
@@ -54,6 +55,7 @@ export async function createApp() {
   app.use('/api/photos', photosRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/albums', albumsRouter);
+  app.use('/api/drive', driveRouter);
 
   // Clear & demo endpoints under /api
   app.use('/api', systemRouter);

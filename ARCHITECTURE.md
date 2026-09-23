@@ -1,6 +1,6 @@
 # Architecture & Technical Blueprint
 
-This document details the system architecture of **Google AI Photo Search**, explaining the specific Google services used, the data pipelines, and the core rationale ("Why") for each technology choice centered on **scalability** and **semantic performance**.
+This document details the system architecture of **Google AI Photo Search (PixSort)**, explaining the specific Google services used, the data pipelines, and the core rationale ("Why") for each technology choice centered on **scalability**, **privacy**, and **semantic performance**.
 
 ---
 
@@ -11,24 +11,26 @@ This document details the system architecture of **Google AI Photo Search**, exp
                           |        Client Layer (React + Tailwind)   |
                           |   - Natural Language Query Interface     |
                           |   - Floating Sticky Library Navigation   |
+                          |   - Connected Storage Dashboard          |
                           |   - Neomorphic Responsive Photo Grid     |
                           +--------------------+---------------------+
                                                | HTTPS / REST
                                                v
                           +--------------------+---------------------+
                           |     Backend Service (Express on Node)    |
-                          |   /api/photos, /api/search, /api/albums  |
+                          |   /api/photos, /api/search, /api/drive   |
                           +---------+----------+----------+----------+
                                     |          |          |
             +-----------------------+          |          +-----------------------+
             |                                  |                                  |
             v                                  v                                  v
 +-----------------------+          +-----------------------+          +-----------------------+
-| Google Cloud Storage  |          |   Firebase Firestore  |          |       Gemini API      |
-|     (Media Store)     |          |   (Metadata Store)    |          | (Vision & Embeddings) |
-| - Raw photo binaries  |          | - Document records    |          | - Gemini 2.5 Flash    |
-| - Optimized thumbnails|          | - Albums & favorites  |          | - Gemini Embedding 2  |
-| - gs:// URIs          |          | - Structured filters  |          |   (768-dim vectors)   |
+|    Google Drive API   |          |   Firebase Firestore  |          |       Gemini API      |
+|  (Multi-Account Pool) |          |   (Metadata Store)    |          | (Vision & Embeddings) |
+| - User's Drive files  |          | - Document records    |          | - Gemini 2.5 Flash    |
+| - Automatic Failover  |          | - driveFileId refs    |          | - Gemini Embedding 2  |
+| - Priority allocation |          | - Albums & favorites  |          |   (768-dim vectors)   |
+| - Organized folders   |          | - Structured filters  |          |                       |
 +-----------------------+          +-----------------------+          +-----------+-----------+
                                                                                   |
                                                                                   v
@@ -70,24 +72,37 @@ This document details the system architecture of **Google AI Photo Search**, exp
 ---
 
 ### 3. Firebase Firestore (Persistent Metadata & Document Store)
-- **Role**: Serverless NoSQL document database managing photo records, album memberships, user favorites, trash lifecycle, and EXIF attributes.
+- **Role**: Serverless NoSQL document database managing photo records, Google Drive file pointers, album memberships, user favorites, and trash lifecycle.
 - **Why for Semantic Performance**:
   - **Hybrid Query Execution**: Complements vector similarity with strict relational filtering. Allows the search engine to merge vector search candidates with precise metadata filters (e.g., *date ranges*, *geographic locations*, or *album memberships*).
-  - **Rich Document Schemas**: Houses detected objects, activities, and AI descriptions in flexible, nested document arrays without rigid SQL migration overhead.
+  - **Lightweight Document References**: Instead of storing binary media, Firestore documents only retain references (`driveFileId`, `driveAccountId`, `driveFolderId`), keeping documents under 2 KB.
 - **Why for Scalability**:
   - **Serverless Auto-Scaling**: Handles traffic spikes effortlessly with zero database provisioning, automatic multi-region sharding, and sub-millisecond document hydration.
   - **Real-Time Synchronization**: Provides live data listener capabilities, updating client interfaces immediately when photo attributes, favorites, or albums are altered.
 
 ---
 
-### 4. Google Cloud Storage (Media & Binary Object Store)
-- **Role**: Secure, high-durability object storage for high-resolution photo originals and optimized web thumbnails (`gs://photos-bucket-prod/...`).
-- **Why for Semantic Performance**:
-  - **Zero Database Bloat**: By offloading heavy image binaries to dedicated blob storage, the database and vector indexes remain exceptionally lightweight and cache-friendly.
-  - **Content Delivery Optimization**: Pairs with Google Cloud CDN edge points for instant image rendering across varied screen resolutions and network conditions.
-- **Why for Scalability**:
-  - **11 9's of Durability**: Provides 99.999999999% annual durability with geo-redundant storage, ensuring personal photos and memories are protected against hardware loss.
-  - **Unlimited Storage Throughput**: Eliminates disk volume bottlenecks through multi-part parallel uploads and signed direct URLs.
+### 4. Google Drive API (Multi-Account Pooled Storage Layer)
+- **Role**: Decentralized personal storage layer pooling user's personal Google Drive accounts into a unified photo library.
+- **Folder Organization in Google Drive**:
+  ```text
+  Google Drive
+  └── AI Photo Search
+      ├── Photos
+      │   ├── 2026
+      │   │   ├── 09
+      │   │   └── 08
+      │   └── 2025
+      └── Thumbnails
+  ```
+- **Storage Allocation & Failover Strategy**:
+  - Automatically allocates uploads to the first active Google Drive account in user's priority order.
+  - Checks file size + real-time available storage via `about.get` quota API.
+  - **Automatic Failover**: If Account 1 is full or encounters quota limits, automatically routes to Account 2, then Account 3.
+  - **Safe Disconnection**: Disconnecting an account preserves all files in the user's Google Drive, only removing access pointers in the application.
+- **Why for Privacy & Economics**:
+  - **User Data Sovereignty**: Photos remain inside the user's personal Google Drive accounts under their ownership and control.
+  - **Zero Central Storage Cost**: Storage scales with the user's personal Drive quota pools (15 GB free per account) rather than racking up centralized cloud bucket bills.
 
 ---
 
@@ -95,22 +110,28 @@ This document details the system architecture of **Google AI Photo Search**, exp
 
 ### Ingestion & Upload Pipeline
 ```
-1. Image File Upload (Client)
+1. Image File Selected (Client)
        │
        ▼
-2. Write Binary to Cloud Storage ──► (gs://photos-bucket-prod/...)
+2. Determine File Size & Available Quota (StorageService)
        │
        ▼
-3. Gemini Vision Analysis ─────────► (Generates aiDescription, objects, activities)
+3. Choose Active Account with Priority & Failover
        │
        ▼
-4. Gemini Embedding 2 ─────────────► (Projects context into 768-dim vector)
+4. Upload to Google Drive (AI Photo Search/Photos/YYYY/MM/)
        │
        ▼
-5. Index into Vertex AI ───────────► (Inserts vector into ANN index)
+5. Gemini 2.5 Flash Vision Analysis (Scene Story & Semantic Tags)
        │
        ▼
-6. Persist to Firestore ───────────► (Stores complete photo document)
+6. Gemini Embedding 2 (768-dim Vector Projection)
+       │
+       ▼
+7. Index into Vertex AI Vector Space
+       │
+       ▼
+8. Persist Metadata & Drive File ID to Firestore
 ```
 
 ### Natural Language Search Pipeline
@@ -118,19 +139,19 @@ This document details the system architecture of **Google AI Photo Search**, exp
 1. User Query: "Pool party"
        │
        ▼
-2. Query Parsing & Intent ─────────► (Extracts keywords, date, and location constraints)
+2. Query Parsing & Intent (Extracts keywords, date, and location constraints)
        │
        ▼
-3. Gemini Embedding 2 ─────────────► (Converts query string into 768-dim vector)
+3. Gemini Embedding 2 (Converts query string into 768-dim vector)
        │
        ▼
-4. Vertex AI Vector Search ────────► (Cosine similarity comparison against indexed vectors)
+4. Vertex AI Vector Search (Cosine similarity comparison across all connected accounts)
        │
        ▼
-5. Firestore Metadata Hydration ───► (Enriches top-ranked vector IDs with full photo details)
+5. Firestore Metadata Hydration (Enriches top-ranked vector IDs with full photo details)
        │
        ▼
-6. Responsive Delivery ────────────► (Returns ranked results with execution metrics)
+6. Responsive Delivery (Returns ranked results with execution metrics)
 ```
 
 ---
@@ -142,5 +163,6 @@ This document details the system architecture of **Google AI Photo Search**, exp
 | **Search Paradigm** | Exact match on filename, manual tags, or EXIF | Continuous semantic similarity over scene meaning |
 | **User Query Experience** | Requires exact keywords (e.g. `file_042.jpg`, `tag:pool`) | Accepts expressive natural queries (e.g. *"refreshing summer swim"*) |
 | **Cataloging Effort** | Requires tedious manual labeling and folder sorting | 100% automated multimodal ingestion via Gemini Vision |
+| **Storage Architecture** | Centralized bucket with mounting bills | Pooled multi-account personal Google Drive with auto-failover |
+| **User Data Control** | Locked in third-party database or server disk | Photos remain safely in user's personal Google Drive |
 | **Scalability Bottleneck** | Expensive SQL `LIKE '%...%'` full-table scans | Sub-second ANN vector lookup with independent Firestore hydration |
-| **Resilience & Storage** | Heavy binaries stored on database disks | Storage separated into Cloud Storage with 11 9's durability |

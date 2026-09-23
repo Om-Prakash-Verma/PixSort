@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { dbService } from '../services/database.js';
-import { storageService } from '../services/storage.js';
+import { storageService, driveStorageService } from '../services/storage.js';
 import { aiService } from '../services/ai.js';
 import { vectorSearchService } from '../services/vectorSearch.js';
 import { Photo } from '../../src/types.js';
 
 export const photosRouter = Router();
 
-// Get photos list
+// Get photos list (Filter out photos belonging to disconnected Drive accounts)
 photosRouter.get('/', async (req: Request, res: Response) => {
   try {
     const albumId = req.query.albumId as string | undefined;
@@ -20,7 +20,17 @@ photosRouter.get('/', async (req: Request, res: Response) => {
       isTrash,
     });
 
-    res.json(photos);
+    // Check disconnected accounts
+    const accounts = await driveStorageService.getAccounts();
+    const disconnectedIds = new Set(
+      accounts.filter((a) => a.status === 'disconnected').map((a) => a.id)
+    );
+
+    const activePhotos = photos.filter(
+      (p) => !p.driveAccountId || !disconnectedIds.has(p.driveAccountId)
+    );
+
+    res.json(activePhotos);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -49,12 +59,13 @@ photosRouter.post('/upload', async (req: Request, res: Response) => {
 
     const photoId = `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    // Step 1: Upload to Google Cloud Storage
+    // Step 1: Upload to Google Drive (with automatic account allocation & failover)
     const stored = await storageService.uploadPhoto(
       photoId,
       filename,
       dataBase64,
-      mimeType || 'image/jpeg'
+      mimeType || 'image/jpeg',
+      dateTaken
     );
 
     // Step 2: Create initial photo record in Firestore with status PROCESSING
@@ -78,6 +89,13 @@ photosRouter.post('/upload', async (req: Request, res: Response) => {
       albumIds: albumId ? [albumId] : [],
       isTrash: false,
       createdAt: new Date().toISOString(),
+      // Google Drive references
+      driveFileId: stored.driveFileId,
+      driveAccountId: stored.driveAccountId,
+      driveFolderId: stored.driveFolderId,
+      driveAccountEmail: stored.driveAccountEmail,
+      fileSize: stored.fileSize,
+      mimeType: mimeType || 'image/jpeg',
     };
 
     await dbService.createPhoto(initialPhoto);
@@ -236,6 +254,15 @@ photosRouter.delete('/:id', async (req: Request, res: Response) => {
     const success = await dbService.deletePhoto(req.params.id, permanent);
 
     if (permanent) {
+      const existing = await dbService.getPhotoById(req.params.id);
+      if (existing) {
+        await storageService.deletePhoto(
+          existing.storagePath,
+          existing.url,
+          existing.driveAccountId,
+          existing.driveFileId
+        );
+      }
       await vectorSearchService.deleteVector(req.params.id);
     } else {
       const vec = vectorSearchService.getVector(req.params.id);

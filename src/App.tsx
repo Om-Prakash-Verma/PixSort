@@ -7,6 +7,7 @@ import { UploadModal } from './components/UploadModal.js';
 import { AlbumsView } from './components/AlbumsView.js';
 import { ArchitectureInspectorModal } from './components/ArchitectureInspectorModal.js';
 import { SimilarPhotosModal } from './components/SimilarPhotosModal.js';
+import { StorageSettingsView } from './components/StorageSettingsView.js';
 import { PresentationDeck } from './components/presentation/PresentationDeck.js';
 import { Photo, Album, SearchResponse, SystemStatus } from './types.js';
 import { ArrowLeft, RefreshCw, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
@@ -477,6 +478,14 @@ export default function App() {
               onFindSimilar={handleFindSimilar}
               onClearSearch={handleClearSearch}
             />
+          ) : activeTab === 'storage' ? (
+            <StorageSettingsView
+              onNotify={showToast}
+              onAccountsUpdated={() => {
+                loadSystemStatus();
+                loadPhotos();
+              }}
+            />
           ) : activeTab === 'albums' && !selectedAlbum ? (
             <AlbumsView
               albums={albums}
@@ -585,6 +594,10 @@ export default function App() {
         <UploadModal
           albums={albums}
           onClose={() => setShowUploadModal(false)}
+          onOpenStorage={() => {
+            setActiveTab('storage');
+            handleClearSearch();
+          }}
           onUploadSuccess={() => {
             loadPhotos();
             loadSystemStatus();
