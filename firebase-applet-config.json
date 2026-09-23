@@ -1,12 +1,11 @@
 {
-  "projectId": "academic-airport-n8gvj",
-  "appId": "1:857140496927:web:6b99d33818cfcb20dca32a",
-  "apiKey": "AIzaSyBlDYnNi7KJugTLFdl7F-Q3u3V-o38WrNc",
-  "authDomain": "academic-airport-n8gvj.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-googleaiphotosea-079faa0a-9d32-47cd-a1d9-4545695cb567",
-  "storageBucket": "academic-airport-n8gvj.firebasestorage.app",
-  "messagingSenderId": "857140496927",
-  "measurementId": "",
-  "oAuthClientId": "857140496927-1lj806cl8f9u4flrtov66fi25em4b5um.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "pixsort-62b7b",
+  "appId": "1:68321745770:web:f350b09f67091736896313",
+  "apiKey": "AIzaSyBgGBtqJl4mlGxgQAttCRBW7-YuiUAWKlA",
+  "authDomain": "pixsort-62b7b.firebaseapp.com",
+  "storageBucket": "pixsort-62b7b.firebasestorage.app",
+  "messagingSenderId": "68321745770",
+  "measurementId": "G-KCRW0YE0LX",
+  "firestoreDatabaseId": "(default)",
+  "oAuthClientId": ""
 }

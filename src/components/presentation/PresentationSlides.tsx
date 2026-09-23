@@ -910,38 +910,43 @@ export const Slide7Architecture: React.FC = () => {
               isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/50 border-blue-200'
             }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800">🟢 Drive A (Primary)</span>
-                <span className="text-[10px] px-1.5 rounded bg-blue-100 text-blue-700 font-bold">14.2 / 15 GB</span>
+                <span className="font-bold text-slate-800">🟢 Drive 1 (Primary)</span>
+                <span className="text-[10px] px-1.5 rounded bg-blue-100 text-blue-700 font-bold">15 GB Quota</span>
               </div>
-              <div className="text-[10px] text-slate-500">om.example@gmail.com</div>
-              <div className="text-[10px] text-amber-700 font-semibold">94.7% Used ➔ Near Quota Limit</div>
+              <div className="text-[10px] text-slate-500 font-bold truncate">omprakashverma.in@gmail.com</div>
+              <div className="text-[10px] text-blue-700 font-semibold">Priority #1 ➔ Active Upload Destination</div>
             </div>
 
             <div className={`p-3 rounded-xl border space-y-1.5 ${
               isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/50 border-emerald-200'
             }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800">🟢 Drive B (Backup)</span>
-                <span className="text-[10px] px-1.5 rounded bg-emerald-100 text-emerald-700 font-bold">3.4 / 15 GB</span>
+                <span className="font-bold text-slate-800">🟢 Drive 2 (Secondary)</span>
+                <span className="text-[10px] px-1.5 rounded bg-emerald-100 text-emerald-700 font-bold">+15 GB Pooled</span>
               </div>
-              <div className="text-[10px] text-slate-500">om.backup@gmail.com</div>
-              <div className="text-[10px] text-emerald-700 font-semibold">22.6% Used ➔ Auto Failover Target</div>
+              <div className="text-[10px] text-slate-500">Secondary Connected Account</div>
+              <div className="text-[10px] text-emerald-700 font-semibold">Priority #2 ➔ Automatic Failover Target</div>
             </div>
 
             <div className={`p-3 rounded-xl border space-y-1.5 ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50/50 border-indigo-200'
             }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800">🟢 Drive C (Archive)</span>
-                <span className="text-[10px] px-1.5 rounded bg-slate-200 text-slate-700 font-bold">0.8 / 15 GB</span>
+                <span className="font-bold text-slate-800">📁 Folder Hierarchy</span>
+                <span className="text-[10px] px-1.5 rounded bg-indigo-100 text-indigo-700 font-bold">Chronological</span>
               </div>
-              <div className="text-[10px] text-slate-500">om.archive@gmail.com</div>
-              <div className="text-[10px] text-slate-600 font-semibold">5.3% Used ➔ Reserve Storage Pool</div>
+              <div className="text-[10px] text-indigo-900 font-mono truncate">AI Photo Search/Photos/YYYY/MM/</div>
+              <div className="text-[10px] text-indigo-700 font-semibold">Thumbnails &amp; Full Photos Auto-Organized</div>
             </div>
           </div>
 
-          <div className="text-xs text-slate-500 pt-1">
-            <em>UX Principle:</em> Complexity is completely hidden from the user. All photos from Drive A, Drive B, and Drive C are indexed together into a single unified search experience.
+          <div className="text-xs text-slate-500 pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <em>UX Principle:</em> Photos stay inside the user&apos;s own Google Drive. Safe disconnection never deletes remote Drive files.
+            </div>
+            <div className="text-[10px] font-mono text-emerald-700 font-bold">
+              Total Storage = N × 15 GB Pooled
+            </div>
           </div>
         </div>
       </div>
@@ -983,29 +988,29 @@ export const Slide8Features: React.FC = () => {
             icon: Search,
             title: 'Conversational Photo Search',
             whatItIs: 'Search like you are asking a friend.',
-            example: 'Try typing: "drinking coffee outside on a sunny day", "receipts from last month", or "playing guitar on stage".',
-            benefit: 'No keywords needed. Natural questions just work.',
+            example: 'Try typing: "drinking coffee outside on a sunny day", "college id card", or "happy dinner with friends".',
+            benefit: 'No keywords or manual tags needed. Natural language search.',
+          },
+          {
+            icon: Cloud,
+            title: 'Pooled Google Drive Storage',
+            whatItIs: 'Multi-account personal cloud pooling.',
+            example: 'Connect multiple personal Google Drive accounts (15 GB + 15 GB). PixSort pools them into one library with automatic capacity failover.',
+            benefit: 'Photos remain in user\'s own Drive. Safe disconnection never deletes files.',
           },
           {
             icon: Eye,
             title: 'Deep AI Scene Inspector',
             whatItIs: 'See what the computer "sees" inside every photo.',
-            example: 'Click any photo to open its inspector card: view the AI-generated story, dominant subjects, emotional atmosphere, and auto-tags.',
+            example: 'Click any photo to view the Gemini-generated description, dominant subjects, aesthetic mood, and Drive storage metadata.',
             benefit: 'Total transparency into why the AI matched your photo.',
           },
           {
             icon: FolderHeart,
-            title: 'Virtual Smart Albums',
-            whatItIs: 'Organize memories without duplicating storage.',
-            example: 'Add a vacation photo to "Favorites", "Summer 2025", and "Family" simultaneously with zero extra hard drive space used.',
-            benefit: 'Instant grouping without messy file duplication.',
-          },
-          {
-            icon: Trash2,
-            title: 'Two-Phase Trash & Restore',
-            whatItIs: 'Accidental deletion protection.',
-            example: 'Deleted photos go into a secure Trash bin first. You can easily restore them anytime or click "Permanently Empty" to delete from cloud.',
-            benefit: 'Peace of mind with full user privacy control.',
+            title: 'Virtual Smart Albums & Safe Bin',
+            whatItIs: 'Zero-duplication memory organization.',
+            example: 'Group photos into "Favorites", "College", and "Family" simultaneously with zero extra storage used, protected by two-phase recovery.',
+            benefit: 'Instant grouping without duplicating files on Google Drive.',
           },
         ].map((feat, idx) => {
           const Icon = feat.icon;
@@ -1199,11 +1204,15 @@ export const Slide10Conclusion: React.FC = () => {
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span><strong>Pooled Google Drive Architecture:</strong> User photos stay in their personal Google Drives with automatic multi-account capacity failover ($0 hosting overhead).</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span><strong>Zero-API Search & Budget Guard:</strong> Built a 100% local hybrid semantic search engine that costs $0 in API credits, runs in ~3ms, and needs 0 cloud queries.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Production-Ready Reliability:</strong> Cloud Firestore persistence, WebP thumbnail optimization, and resilient offline fallbacks.</span>
+              <span><strong>Production-Ready Reliability:</strong> Cloud Firestore persistence (<code className="font-mono text-xs">pixsort-62b7b</code>), thumbnail optimization, and resilient offline cache.</span>
             </li>
           </ul>
         </div>

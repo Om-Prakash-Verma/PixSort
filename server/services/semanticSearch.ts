@@ -318,7 +318,7 @@ export class SemanticSearchEngine {
     location?: string;
     favorite?: boolean;
     albumId?: string;
-  }): Promise<SearchResponse> {
+  }, userId: string = 'user_default'): Promise<SearchResponse> {
     const startTime = Date.now();
     const intent = this.parseIntent(query);
 
@@ -336,7 +336,7 @@ export class SemanticSearchEngine {
     const vectorMatches = await vectorSearchService.queryNearestNeighbors(
       queryVector,
       {
-        userId: 'user_default',
+        userId,
         datePattern: effectiveDate,
         location: effectiveLocation,
         isFavorite: effectiveFavorite,
@@ -347,7 +347,7 @@ export class SemanticSearchEngine {
     );
 
     // Step 3: Fetch candidate photos from database
-    const allCandidates = await dbService.getPhotos('user_default', {
+    const allCandidates = await dbService.getPhotos(userId, {
       isTrash: false,
       isFavorite: effectiveFavorite,
       albumId: effectiveAlbum,

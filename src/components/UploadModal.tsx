@@ -12,12 +12,14 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Album, ConnectedDriveAccount } from '../types.js';
+import { AuthUser } from './AuthModal.js';
 
 interface UploadModalProps {
   albums: Album[];
   onClose: () => void;
   onUploadSuccess: () => void;
   onOpenStorage?: () => void;
+  currentUser?: AuthUser | null;
 }
 
 type PipelineStep = 'idle' | 'allocating' | 'uploading' | 'processing' | 'indexing' | 'ready';
@@ -27,6 +29,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose,
   onUploadSuccess,
   onOpenStorage,
+  currentUser,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -48,7 +51,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const res = await fetch('/api/drive/accounts');
+        const res = await fetch('/api/drive/accounts', {
+          headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+        });
         if (res.ok) {
           const data = await res.json();
           const active = (data.accounts || []).filter((a: ConnectedDriveAccount) => a.status === 'active');
@@ -62,7 +67,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
     };
     loadAccounts();
-  }, []);
+  }, [currentUser]);
 
   // Update target account whenever file changes
   useEffect(() => {
@@ -124,7 +129,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // Step 1: Upload to Google Drive API
       const res = await fetch('/api/photos/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+        },
         body: JSON.stringify({
           filename: file.name,
           dataBase64: previewUrl,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers, Presentation, History, Trash2, ArrowUpRight } from 'lucide-react';
+import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers, Presentation, History, Trash2, ArrowUpRight, LogOut, User } from 'lucide-react';
 import { SystemStatus } from '../types.js';
+import { AuthUser } from './AuthModal.js';
 
 interface HeaderProps {
   searchQuery: string;
@@ -12,6 +13,8 @@ interface HeaderProps {
   onOpenPresentation: () => void;
   systemStatus: SystemStatus | null;
   isSearching: boolean;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 const RECENT_SEARCHES_STORAGE_KEY = 'pixsort_recent_searches_v1';
@@ -39,6 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPresentation,
   systemStatus,
   isSearching,
+  currentUser,
+  onLogout,
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -272,6 +277,40 @@ export const Header: React.FC<HeaderProps> = ({
           <Upload className="w-4 h-4" />
           <span className="hidden sm:inline">Upload</span>
         </button>
+
+        {currentUser && (
+          <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
+            <div
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl neo-inset bg-white/70"
+              title={`Logged in as ${currentUser.email || currentUser.displayName}`}
+            >
+              {currentUser.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.displayName || 'User'}
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+                  {(currentUser.displayName || currentUser.email || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className="text-xs font-bold text-slate-800 max-w-[120px] truncate hidden md:inline">
+                {currentUser.displayName || currentUser.email?.split('@')[0]}
+              </span>
+            </div>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-xl neo-btn text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                title="Log Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

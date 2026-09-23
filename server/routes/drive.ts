@@ -26,8 +26,9 @@ function getGoogleClientId(): string {
  */
 driveRouter.get('/accounts', async (req: Request, res: Response) => {
   try {
-    const accounts = await driveStorageService.getAccounts();
-    const pooledStats = driveStorageService.getPooledStats();
+    const userId = (req.headers['x-user-id'] as string) || (req.query.userId as string);
+    const accounts = await driveStorageService.getAccounts(userId);
+    const pooledStats = driveStorageService.getPooledStats(userId);
     res.json({
       accounts,
       stats: pooledStats,
@@ -35,6 +36,29 @@ driveRouter.get('/accounts', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * GET /api/drive/config
+ * Provides public client configuration for Firebase Auth popup
+ */
+driveRouter.get('/config', (req: Request, res: Response) => {
+  try {
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return res.json({
+        apiKey: config.apiKey,
+        authDomain: config.authDomain,
+        projectId: config.projectId,
+        appId: config.appId,
+        oAuthClientId: config.oAuthClientId,
+      });
+    }
+  } catch (err) {
+    console.warn('[Drive Config] Warning reading config:', err);
+  }
+  res.status(404).json({ error: 'Config not available' });
 });
 
 /**
@@ -134,6 +158,7 @@ driveRouter.get('/oauth/callback', async (req: Request, res: Response) => {
 driveRouter.post('/accounts/connect', async (req: Request, res: Response) => {
   try {
     const { email, storageLimitGb, storageUsedGb, accessToken, refreshToken } = req.body;
+    const userId = (req.headers['x-user-id'] as string) || (req.body.userId as string) || 'user_default';
     if (!email) {
       return res.status(400).json({ error: 'Google account email is required' });
     }
@@ -142,6 +167,7 @@ driveRouter.post('/accounts/connect', async (req: Request, res: Response) => {
     const used = storageUsedGb !== undefined ? storageUsedGb * 1024 * 1024 * 1024 : Math.round(1.5 * 1024 * 1024 * 1024);
 
     const account = await driveStorageService.connectAccount({
+      userId,
       googleAccountEmail: email,
       storageLimit: limit,
       storageUsed: used,

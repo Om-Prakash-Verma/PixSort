@@ -1,0 +1,16 @@
+[
+  {
+    "id": "drive_acc_om",
+    "userId": "user_default",
+    "googleAccountEmail": "omprakashverma.in@gmail.com",
+    "googleAccountId": "google_om_primary",
+    "storageLimit": 16106127360,
+    "storageUsed": 858993459,
+    "storageAvailable": 15247133901,
+    "priority": 1,
+    "status": "active",
+    "photoCount": 0,
+    "createdAt": "2026-09-23T14:53:39.194Z",
+    "updatedAt": "2026-09-23T14:56:21.154Z"
+  }
+]

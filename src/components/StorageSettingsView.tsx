@@ -20,15 +20,18 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConnectedDriveAccount } from '../types.js';
+import { AuthUser } from './AuthModal.js';
 
 interface StorageSettingsViewProps {
   onNotify?: (msg: string) => void;
   onAccountsUpdated?: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   onNotify,
   onAccountsUpdated,
+  currentUser,
 }) => {
   const [accounts, setAccounts] = useState<ConnectedDriveAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,9 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/drive/accounts');
+      const res = await fetch('/api/drive/accounts', {
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
@@ -62,7 +67,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [currentUser]);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 GB';
@@ -160,31 +165,90 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   };
 
   // Connect new account (Section 2)
-  const handleConnectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customEmail) return;
-
-    setIsConnecting(true);
+  const connectAccountByEmail = async (
+    email: string,
+    storageLimitGb = 15,
+    storageUsedGb = 1.2,
+    accessToken?: string
+  ) => {
     try {
+      setIsConnecting(true);
       const res = await fetch('/api/drive/accounts/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+        },
         body: JSON.stringify({
-          email: customEmail.trim(),
-          storageLimitGb: parseFloat(customQuotaGb) || 15,
-          storageUsedGb: parseFloat(customUsedGb) || 1.5,
+          email: email.trim(),
+          storageLimitGb,
+          storageUsedGb,
+          accessToken,
         }),
       });
 
       if (res.ok) {
-        onNotify?.(`Connected Google Drive account: ${customEmail}`);
+        onNotify?.(`Connected Google Drive account: ${email.trim()}`);
         setShowConnectModal(false);
         setCustomEmail('');
         await fetchAccounts();
         onAccountsUpdated?.();
+      } else {
+        const data = await res.json();
+        onNotify?.(data.error || 'Failed to connect account.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Connect account error:', err);
+      onNotify?.(err.message || 'Connection error.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleConnectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customEmail.trim()) return;
+    await connectAccountByEmail(
+      customEmail.trim(),
+      parseFloat(customQuotaGb) || 15,
+      parseFloat(customUsedGb) || 1.5
+    );
+  };
+
+  // Google Sign-In Popup with Drive scopes
+  const handleGooglePopupAuth = async () => {
+    try {
+      setIsConnecting(true);
+      const configRes = await fetch('/api/drive/config');
+      if (!configRes.ok) {
+        throw new Error('Configuration not available');
+      }
+      const config = await configRes.json();
+
+      const { initializeApp, getApps } = await import('firebase/app');
+      const { getAuth, GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+
+      const apps = getApps();
+      const app = apps.length > 0 ? apps[0] : initializeApp(config);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
+
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken;
+      const email = result.user?.email || 'omprakashverma.in@gmail.com';
+
+      await connectAccountByEmail(email, 15, 1.2, accessToken);
+    } catch (err: any) {
+      console.error('Google popup sign-in error:', err);
+      const msg =
+        err.code === 'auth/unauthorized-domain'
+          ? 'Domain localhost is not authorized on shared Firebase project. Please click "Connect Now" under Option 1 above!'
+          : err.code === 'auth/popup-closed-by-user'
+          ? 'Google popup was blocked or closed. Click "Connect Now" under Option 1 to connect instantly!'
+          : (err.message || 'Popup sign-in not available. Please use Option 1.');
+      onNotify?.(msg);
     } finally {
       setIsConnecting(false);
     }
@@ -529,46 +593,49 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                 </button>
               </div>
 
-              {/* Option 1: Direct Personal Account Connect (Recommended - 0 Setup) */}
-              <div className="p-4 rounded-2xl neo-raised space-y-3 border border-emerald-200/60 bg-emerald-50/40">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Option 1: Direct Personal Google Drive Connect
+              {/* Single Unified Google Drive Connect Interface */}
+              <div className="space-y-4">
+                {/* Official Google Sign-In Button */}
+                <button
+                  type="button"
+                  disabled={isConnecting}
+                  onClick={handleGooglePopupAuth}
+                  className="w-full py-3.5 px-4 rounded-2xl neo-btn flex items-center justify-center gap-3 text-xs font-bold text-slate-800 hover:text-blue-700 bg-white border border-blue-200/80 cursor-pointer shadow-sm transition-all"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span className="text-sm">
+                    {isConnecting ? 'Connecting...' : 'Sign in with Google Account'}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                    Recommended
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Instantly pools your personal Google Drive account into the application without needing to edit Google Cloud Console URI credentials.
-                </p>
+                </button>
 
-                {/* 1-Click Chip for current user */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomEmail('omprakashverma.in@gmail.com');
-                      setCustomQuotaGb('15');
-                      setCustomUsedGb('1.2');
-                    }}
-                    className="w-full p-2.5 rounded-xl neo-btn flex items-center justify-between text-xs font-mono font-bold text-slate-800 hover:text-blue-700 bg-white cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      omprakashverma.in@gmail.com
-                    </span>
-                    <span className="text-[10px] text-blue-600 font-sans font-semibold">
-                      Click to Pre-fill ➔
-                    </span>
-                  </button>
+                <div className="flex items-center gap-3 text-slate-400 text-xs">
+                  <div className="h-px bg-slate-300/70 flex-1" />
+                  <span>or enter email</span>
+                  <div className="h-px bg-slate-300/70 flex-1" />
                 </div>
 
-                <form onSubmit={handleConnectSubmit} className="space-y-2.5 pt-1">
+                {/* Direct Google Account Email Link */}
+                <form onSubmit={handleConnectSubmit} className="space-y-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Google Account Email
+                      Google Drive Email Address
                     </label>
                     <input
                       type="email"
@@ -576,38 +643,8 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                       placeholder="e.g. omprakashverma.in@gmail.com"
                       value={customEmail}
                       onChange={(e) => setCustomEmail(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl neo-inset text-slate-800 text-xs focus:outline-none bg-white"
+                      className="w-full px-3 py-2.5 rounded-xl neo-inset text-slate-800 text-xs focus:outline-none bg-white border border-slate-200"
                     />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Drive Quota (GB)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={customQuotaGb}
-                        onChange={(e) => setCustomQuotaGb(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl neo-inset text-slate-800 focus:outline-none bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Used Storage (GB)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={customUsedGb}
-                        onChange={(e) => setCustomUsedGb(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl neo-inset text-slate-800 focus:outline-none bg-white"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-1">
@@ -621,57 +658,12 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                     <button
                       type="submit"
                       disabled={isConnecting || !customEmail}
-                      className="px-5 py-2 rounded-xl neo-btn text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-100/80 cursor-pointer disabled:opacity-50"
+                      className="px-5 py-2 rounded-xl neo-btn text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
                     >
-                      {isConnecting ? 'Connecting...' : 'Connect to Storage Pool'}
+                      {isConnecting ? 'Connecting...' : 'Connect Google Drive'}
                     </button>
                   </div>
                 </form>
-              </div>
-
-              {/* Option 2: Browser OAuth Web Flow (Requires Cloud Console redirect URI) */}
-              <div className="p-4 rounded-2xl neo-raised space-y-2 border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
-                    Option 2: Browser OAuth 2.0 Web Redirect
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-semibold">
-                    Google Cloud Console
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl neo-inset bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
-                  <p className="font-semibold mb-1">Why &ldquo;Error 400: redirect_uri_mismatch&rdquo; occurs:</p>
-                  <p>
-                    Google OAuth requires registering the exact callback URI below under:
-                    <br />
-                    <strong>Google Cloud Console ➔ APIs & Services ➔ Credentials ➔ OAuth 2.0 Client IDs ➔ Authorized redirect URIs</strong>
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <code className="px-2 py-1 rounded bg-white border border-amber-300 font-mono text-[10px] text-slate-800 select-all flex-1 truncate">
-                      http://localhost:3000/api/drive/oauth/callback
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText('http://localhost:3000/api/drive/oauth/callback');
-                        onNotify?.('Copied redirect URI to clipboard');
-                      }}
-                      className="px-2 py-1 rounded-lg neo-btn text-[10px] font-bold text-blue-700 hover:text-blue-900 shrink-0 bg-white"
-                    >
-                      Copy URI
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleStartOAuth}
-                  className="w-full mt-1 py-2 rounded-xl neo-btn text-xs font-semibold text-slate-700 hover:text-blue-700 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Start OAuth (If Redirect URI Registered)</span>
-                </button>
               </div>
             </motion.div>
           </div>

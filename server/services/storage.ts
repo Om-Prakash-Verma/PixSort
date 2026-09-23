@@ -26,9 +26,10 @@ export class StorageServiceFacade {
     filename: string,
     dataBase64: string,
     mimeType: string = 'image/jpeg',
-    dateTaken?: string
+    dateTaken?: string,
+    userId?: string
   ): Promise<StorageUploadResult> {
-    return this.driveProvider.uploadPhoto(photoId, filename, dataBase64, mimeType, dateTaken);
+    return this.driveProvider.uploadPhoto(photoId, filename, dataBase64, mimeType, dateTaken, userId);
   }
 
   /**
@@ -51,8 +52,8 @@ export class StorageServiceFacade {
     return fs.readdirSync(this.storageDir).length;
   }
 
-  getCloudStatus() {
-    const pooled = this.driveProvider.getPooledStats();
+  getCloudStatus(userId?: string) {
+    const pooled = this.driveProvider.getPooledStats(userId);
     return {
       isConnected: pooled.activeCount > 0,
       bucketName: pooled.primaryAccountEmail || 'Google Drive',

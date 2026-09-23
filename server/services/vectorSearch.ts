@@ -111,8 +111,13 @@ export class VertexAIVectorSearchService {
     return all.filter((r) => r.id !== photoId).slice(0, topK);
   }
 
-  getIndexedCount(): number {
-    return this.index.size;
+  getIndexedCount(userId?: string): number {
+    if (!userId) return this.index.size;
+    let count = 0;
+    for (const item of this.index.values()) {
+      if (item.userId === userId || item.userId === 'user_default') count++;
+    }
+    return count;
   }
 
   clear() {
