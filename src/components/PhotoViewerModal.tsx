@@ -428,8 +428,28 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Storage Path:</span>
-                  <span className="font-mono text-[10px] text-slate-600 truncate max-w-[170px]">
+                  <span className="text-slate-400">Storage Layer:</span>
+                  <span className="font-semibold text-blue-700">Google Drive API</span>
+                </div>
+                {photo.driveAccountEmail && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Drive Account:</span>
+                    <span className="font-mono text-slate-800 text-[10px] truncate max-w-[160px]" title={photo.driveAccountEmail}>
+                      {photo.driveAccountEmail}
+                    </span>
+                  </div>
+                )}
+                {photo.driveFileId && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Drive File ID:</span>
+                    <span className="font-mono text-[10px] text-slate-600 truncate max-w-[160px]" title={photo.driveFileId}>
+                      {photo.driveFileId}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Folder Path:</span>
+                  <span className="font-mono text-[10px] text-slate-600 truncate max-w-[170px]" title={photo.storagePath}>
                     {photo.storagePath}
                   </span>
                 </div>

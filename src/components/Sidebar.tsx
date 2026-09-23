@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 
-export type ActiveTab = 'photos' | 'favorites' | 'albums' | 'recent' | 'trash';
+export type ActiveTab = 'photos' | 'favorites' | 'albums' | 'recent' | 'trash' | 'storage';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -39,15 +39,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'favorites' as ActiveTab, label: 'Favorites', icon: Heart, count: favoritesCount },
     { id: 'albums' as ActiveTab, label: 'Albums', icon: FolderHeart, count: albumsCount },
     { id: 'recent' as ActiveTab, label: 'Recently Added', icon: Clock },
+    {
+      id: 'storage' as ActiveTab,
+      label: 'Connected Storage',
+      icon: HardDrive,
+      count: systemStatus?.googleDriveActiveCount,
+    },
     { id: 'trash' as ActiveTab, label: 'Trash', icon: Trash2, count: trashCount },
   ];
 
   return (
-    <aside className="sidebar w-64 shrink-0 bg-[#EEF2F6] neo-raised rounded-3xl border border-white/70 p-4 my-4 ml-4 mb-4 flex flex-col justify-between hidden md:flex sticky top-0 h-screen overflow-y-auto z-20 shadow-sm transition-all duration-200">
+    <aside className="sidebar w-64 shrink-0 bg-[#EEF2F6] neo-raised rounded-3xl border border-white/70 p-4 my-4 ml-4 mb-4 flex flex-col justify-between hidden md:flex sticky top-4 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto z-20 shadow-sm transition-all duration-200">
       {/* Navigation Links */}
       <div className="space-y-1.5">
         <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">
-          Library
+          Library & Storage
         </div>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -56,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
                 isActive
                   ? 'neo-inset text-blue-700 font-bold'
                   : 'neo-btn text-slate-600 hover:text-slate-900'
@@ -83,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="pt-2">
             <button
               onClick={onOpenPresentation}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold neo-btn text-purple-700 hover:text-purple-900 transition-all border border-purple-200/50"
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold neo-btn text-purple-700 hover:text-purple-900 transition-all border border-purple-200/50 cursor-pointer"
               title="Open Project Presentation Deck (/presentation)"
             >
               <div className="flex items-center gap-2.5">
@@ -103,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            AI & Search Engine
+            AI & Storage Pool
           </span>
           <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -117,13 +123,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="font-semibold text-emerald-700 flex items-center gap-1">
               Local Semantic
               <span className="text-[9px] font-mono bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-bold">
-                0 API Calls
+                0 API
               </span>
             </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">Search Latency</span>
-            <span className="font-mono text-emerald-700 font-bold">~3 ms ($0 cost)</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Ingestion Vision</span>
@@ -132,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Vector Index</span>
             <span className="font-medium text-slate-700">
-              Vertex AI ({systemStatus?.indexedVectorsCount ?? 0} vectors)
+              Vertex AI ({systemStatus?.indexedVectorsCount ?? 0})
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -148,7 +150,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Photo Store</span>
-            <span className="font-medium text-slate-700">Cloud Storage</span>
+            <span className="font-medium text-blue-700 flex items-center gap-1">
+              <HardDrive className="w-3 h-3 text-blue-600" />
+              Drive API ({systemStatus?.googleDriveActiveCount ?? 2} Pooled)
+            </span>
           </div>
         </div>
       </div>
