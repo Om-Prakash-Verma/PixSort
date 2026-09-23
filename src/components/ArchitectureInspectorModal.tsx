@@ -95,15 +95,23 @@ export const ArchitectureInspectorModal: React.FC<ArchitectureInspectorModalProp
                 <Cloud className="w-3.5 h-3.5 text-blue-600" />
                 Cloud Storage
               </span>
-              <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
-                <CheckCircle2 className="w-3 h-3" /> 5 GB Free
-              </span>
+              {systemStatus?.cloudStorageProvisioned ? (
+                <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> 5 GB Free
+                </span>
+              ) : (
+                <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5" title="Bucket pending activation in Firebase Console">
+                  Setup in Console
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 font-mono truncate" title={systemStatus?.cloudStorageBucket || 'Google Cloud Storage'}>
               {systemStatus?.cloudStorageBucket ? `gs://${systemStatus.cloudStorageBucket}` : 'Cloud Bucket'}
             </p>
             <p className="text-[10px] text-slate-400">
-              {systemStatus?.cloudStorageItems ?? 0} photos uploaded
+              {systemStatus?.cloudStorageProvisioned
+                ? `${systemStatus?.cloudStorageItems ?? 0} photos uploaded (Cloud CDN)`
+                : 'Local fallback active (Bucket needs 1-click creation in Firebase)'}
             </p>
           </div>
         </div>

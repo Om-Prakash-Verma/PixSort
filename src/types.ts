@@ -60,6 +60,7 @@ export interface SystemStatus {
   cloudStorageItems: number;
   cloudStorageConnected?: boolean;
   cloudStorageBucket?: string;
+  cloudStorageProvisioned?: boolean;
   firestoreConnected?: boolean;
   firebaseProjectId?: string;
 }

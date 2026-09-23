@@ -16,6 +16,7 @@ export class GoogleCloudStorageService {
   private firebaseStorage: FirebaseStorage | null = null;
   private bucketName: string = 'photos-bucket-prod';
   private isCloudConnected: boolean = false;
+  private bucketProvisioned: boolean = false;
 
   constructor() {
     this.storageDir = path.join(process.cwd(), 'public', 'uploads');
@@ -37,18 +38,34 @@ export class GoogleCloudStorageService {
           this.bucketName = config.storageBucket;
           this.firebaseStorage = getStorage(app, `gs://${config.storageBucket}`);
           this.isCloudConnected = true;
-          console.log(`[Cloud Storage] Connected to Google Cloud / Firebase Storage bucket: gs://${config.storageBucket}`);
+          this.checkBucketAvailability();
         } else if (config.projectId) {
           const defaultBucket = `${config.projectId}.firebasestorage.app`;
           this.bucketName = defaultBucket;
           this.firebaseStorage = getStorage(app, `gs://${defaultBucket}`);
           this.isCloudConnected = true;
-          console.log(`[Cloud Storage] Connected using project bucket: gs://${defaultBucket}`);
+          this.checkBucketAvailability();
         }
       }
     } catch (err: any) {
       console.warn('[Cloud Storage] Initialization note (falling back to hybrid local buffer):', err?.message || err);
       this.isCloudConnected = false;
+    }
+  }
+
+  private async checkBucketAvailability() {
+    try {
+      const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${this.bucketName}/o`);
+      if (res.status === 404) {
+        this.bucketProvisioned = false;
+        console.warn(`[Cloud Storage] Notice: Bucket gs://${this.bucketName} is not yet provisioned in the Firebase Console (HTTP 404).`);
+        console.warn(`[Cloud Storage] To activate: Open Firebase Console (https://console.firebase.google.com/) -> Storage -> "Get Started".`);
+      } else {
+        this.bucketProvisioned = true;
+        console.log(`[Cloud Storage] Verified bucket gs://${this.bucketName} is active and ready for uploads.`);
+      }
+    } catch {
+      this.bucketProvisioned = false;
     }
   }
 
@@ -154,10 +171,11 @@ export class GoogleCloudStorageService {
     return fs.readdirSync(this.storageDir).length;
   }
 
-  getCloudStatus(): { isConnected: boolean; bucketName: string } {
+  getCloudStatus(): { isConnected: boolean; bucketName: string; isProvisioned: boolean } {
     return {
       isConnected: this.isCloudConnected,
       bucketName: this.bucketName,
+      isProvisioned: this.bucketProvisioned,
     };
   }
 }
