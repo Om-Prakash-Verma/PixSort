@@ -9,15 +9,16 @@ export const systemRouter = Router();
 
 // System status
 systemRouter.get('/status', (req: Request, res: Response) => {
-  const stats = dbService.getStats();
-  const cloudStorageStatus = storageService.getCloudStatus();
-  const pooled = driveStorageService.getPooledStats();
+  const userId = (req.headers['x-user-id'] as string) || (req.query.userId as string);
+  const stats = dbService.getStats(userId);
+  const cloudStorageStatus = storageService.getCloudStatus(userId);
+  const pooled = driveStorageService.getPooledStats(userId);
 
   const status: SystemStatus = {
     geminiEmbeddingModel: 'gemini-embedding-2-preview',
     hasGeminiKey: aiService.getHasKey(),
     vertexVectorSearchReady: true,
-    indexedVectorsCount: vectorSearchService.getIndexedCount(),
+    indexedVectorsCount: vectorSearchService.getIndexedCount(userId),
     totalPhotosCount: stats.total,
     readyPhotosCount: stats.ready,
     processingCount: stats.processing,

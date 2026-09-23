@@ -7,11 +7,12 @@ export const searchRouter = Router();
 searchRouter.post('/', async (req: Request, res: Response) => {
   try {
     const { query, filters } = req.body;
+    const userId = (req.headers['x-user-id'] as string) || (req.body.userId as string) || 'user_default';
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    const searchResponse = await semanticSearchEngine.executeSearch(query, filters);
+    const searchResponse = await semanticSearchEngine.executeSearch(query, filters, userId);
     res.json(searchResponse);
   } catch (err: any) {
     console.error('Search error:', err);

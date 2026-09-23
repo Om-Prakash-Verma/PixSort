@@ -44,55 +44,68 @@ export class GoogleDriveStorageProvider {
     this.initDefaultAccounts();
   }
 
+  private accountsFile = path.join(process.cwd(), 'data', 'drive_accounts.json');
+
+  private saveAccountsToFile() {
+    try {
+      const dir = path.dirname(this.accountsFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.accountsFile, JSON.stringify(Array.from(this.accounts.values()), null, 2));
+    } catch (err) {
+      console.warn('[Drive Storage] Could not persist accounts to file:', err);
+    }
+  }
+
   /**
-   * Initializes starter accounts from the specification if no persistent accounts exist yet
+   * Initializes real accounts from persistence, strictly removing any demo accounts
    */
   private async initDefaultAccounts() {
-    // 15 GB = 15 * 1024 * 1024 * 1024 = 16,106,127,360 bytes
-    const FIFTEEN_GB = 15 * 1024 * 1024 * 1024;
+    try {
+      if (fs.existsSync(this.accountsFile)) {
+        const raw = fs.readFileSync(this.accountsFile, 'utf-8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          for (const acc of data) {
+            // Strip any dummy accounts
+            if (acc.googleAccountEmail !== 'om.example@gmail.com' && acc.googleAccountEmail !== 'om.backup@gmail.com') {
+              this.accounts.set(acc.id, acc);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Drive Storage] Error loading saved accounts:', err);
+    }
 
-    const defaultAccounts: ConnectedDriveAccount[] = [
-      {
-        id: 'drive_acc_primary',
+    // Default to the user's connected account if accounts is empty
+    if (this.accounts.size === 0) {
+      const FIFTEEN_GB = 15 * 1024 * 1024 * 1024;
+      const primary: ConnectedDriveAccount = {
+        id: 'drive_acc_om',
         userId: 'user_default',
-        googleAccountEmail: 'om.example@gmail.com',
-        googleAccountId: 'google_1082348912',
+        googleAccountEmail: 'omprakashverma.in@gmail.com',
+        googleAccountId: 'google_om_primary',
         storageLimit: FIFTEEN_GB,
-        storageUsed: Math.round(14.2 * 1024 * 1024 * 1024), // 14.2 GB used (94.7%)
-        storageAvailable: FIFTEEN_GB - Math.round(14.2 * 1024 * 1024 * 1024), // ~800 MB remaining
+        storageUsed: Math.round(0.8 * 1024 * 1024 * 1024),
+        storageAvailable: FIFTEEN_GB - Math.round(0.8 * 1024 * 1024 * 1024),
         priority: 1,
         status: 'active',
-        photoCount: 0,
-        createdAt: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
+        photoCount: 1,
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      },
-      {
-        id: 'drive_acc_backup',
-        userId: 'user_default',
-        googleAccountEmail: 'om.backup@gmail.com',
-        googleAccountId: 'google_2098471239',
-        storageLimit: FIFTEEN_GB,
-        storageUsed: Math.round(3.4 * 1024 * 1024 * 1024), // 3.4 GB used (22.6%)
-        storageAvailable: FIFTEEN_GB - Math.round(3.4 * 1024 * 1024 * 1024), // ~11.6 GB remaining
-        priority: 2,
-        status: 'active',
-        photoCount: 0,
-        createdAt: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ];
-
-    for (const acc of defaultAccounts) {
-      this.accounts.set(acc.id, acc);
+      };
+      this.accounts.set(primary.id, primary);
+      this.saveAccountsToFile();
     }
+
     this.isInitialized = true;
   }
 
   /**
    * Sync photo counts for each connected account from Firestore
    */
-  public async syncPhotoCounts(): Promise<void> {
-    const photos = await dbService.getPhotos('user_default');
+  public async syncPhotoCounts(userId?: string): Promise<void> {
+    const photos = await dbService.getPhotos(userId || 'user_default');
     const counts = new Map<string, number>();
 
     for (const p of photos) {
@@ -108,9 +121,11 @@ export class GoogleDriveStorageProvider {
   /**
    * Get all connected accounts, sanitized (no sensitive tokens returned)
    */
-  public async getAccounts(): Promise<ConnectedDriveAccount[]> {
-    await this.syncPhotoCounts();
-    return Array.from(this.accounts.values()).sort((a, b) => a.priority - b.priority);
+  public async getAccounts(userId?: string): Promise<ConnectedDriveAccount[]> {
+    await this.syncPhotoCounts(userId);
+    const all = Array.from(this.accounts.values());
+    const filtered = userId ? all.filter((a) => a.userId === userId || a.userId === 'user_default') : all;
+    return filtered.sort((a, b) => a.priority - b.priority);
   }
 
   /**
@@ -124,8 +139,9 @@ export class GoogleDriveStorageProvider {
    * Selects an account for upload according to priority order and available space.
    * Throws StorageQuotaExceededError if no active account can accept the file.
    */
-  public async allocateAccountForUpload(fileSizeBytes: number): Promise<ConnectedDriveAccount> {
-    const sortedAccounts = Array.from(this.accounts.values())
+  public async allocateAccountForUpload(fileSizeBytes: number, userId?: string): Promise<ConnectedDriveAccount> {
+    const accounts = await this.getAccounts(userId);
+    const sortedAccounts = accounts
       .filter((a) => a.status === 'active')
       .sort((a, b) => a.priority - b.priority);
 
@@ -153,6 +169,7 @@ export class GoogleDriveStorageProvider {
    * Connect a new Google Drive account
    */
   public async connectAccount(data: {
+    userId?: string;
     googleAccountEmail: string;
     googleAccountId?: string;
     credentials?: DriveAccountCredentials;
@@ -166,10 +183,12 @@ export class GoogleDriveStorageProvider {
 
     if (existing) {
       existing.status = 'active';
+      if (data.userId) existing.userId = data.userId;
       existing.updatedAt = new Date().toISOString();
       if (data.credentials) {
         this.credentials.set(existing.id, data.credentials);
       }
+      this.saveAccountsToFile();
       return existing;
     }
 
@@ -180,7 +199,7 @@ export class GoogleDriveStorageProvider {
 
     const newAccount: ConnectedDriveAccount = {
       id,
-      userId: 'user_default',
+      userId: data.userId || 'user_default',
       googleAccountEmail: data.googleAccountEmail,
       googleAccountId: data.googleAccountId || `google_${Date.now()}`,
       storageLimit: limit,
@@ -198,6 +217,8 @@ export class GoogleDriveStorageProvider {
       this.credentials.set(id, data.credentials);
     }
 
+    this.saveAccountsToFile();
+
     // Attempt to pull real quota from Google Drive API if token provided
     await this.refreshQuotaFromDrive(id);
 
@@ -212,6 +233,7 @@ export class GoogleDriveStorageProvider {
     if (!acc) return false;
     acc.status = 'active';
     acc.updatedAt = new Date().toISOString();
+    this.saveAccountsToFile();
     return true;
   }
 
@@ -225,6 +247,7 @@ export class GoogleDriveStorageProvider {
     // Mark as disconnected, never delete remote Google Drive files!
     acc.status = 'disconnected';
     acc.updatedAt = new Date().toISOString();
+    this.saveAccountsToFile();
     return true;
   }
 
@@ -240,6 +263,7 @@ export class GoogleDriveStorageProvider {
       }
     });
 
+    this.saveAccountsToFile();
     return this.getAccounts();
   }
 
@@ -283,7 +307,8 @@ export class GoogleDriveStorageProvider {
     filename: string,
     dataBase64: string,
     mimeType: string = 'image/jpeg',
-    dateTaken?: string
+    dateTaken?: string,
+    userId?: string
   ): Promise<StorageUploadResult> {
     const ext = filename.split('.').pop() || 'jpg';
     const cleanFilename = `${photoId}.${ext}`;
@@ -297,8 +322,9 @@ export class GoogleDriveStorageProvider {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const driveFolderPath = `AI Photo Search/Photos/${year}/${month}`;
 
-    // Get active accounts sorted by priority
-    const candidates = Array.from(this.accounts.values())
+    // Get active accounts sorted by priority for this user
+    const accounts = await this.getAccounts(userId);
+    const candidates = accounts
       .filter((a) => a.status === 'active')
       .sort((a, b) => a.priority - b.priority);
 
@@ -584,8 +610,10 @@ export class GoogleDriveStorageProvider {
   /**
    * Summary metrics across all connected accounts
    */
-  public getPooledStats() {
-    const all = Array.from(this.accounts.values());
+  public getPooledStats(userId?: string) {
+    const all = Array.from(this.accounts.values()).filter(
+      (a) => !userId || a.userId === userId || a.userId === 'user_default'
+    );
     const active = all.filter((a) => a.status === 'active');
     const sorted = [...active].sort((a, b) => a.priority - b.priority);
 

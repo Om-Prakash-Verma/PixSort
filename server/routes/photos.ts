@@ -13,8 +13,9 @@ photosRouter.get('/', async (req: Request, res: Response) => {
     const albumId = req.query.albumId as string | undefined;
     const isFavorite = req.query.favorite === 'true' ? true : undefined;
     const isTrash = req.query.trash === 'true' ? true : false;
+    const userId = (req.headers['x-user-id'] as string) || (req.query.userId as string) || 'user_default';
 
-    const photos = await dbService.getPhotos('user_default', {
+    const photos = await dbService.getPhotos(userId, {
       albumId,
       isFavorite,
       isTrash,
@@ -53,6 +54,7 @@ photosRouter.get('/:id', async (req: Request, res: Response) => {
 photosRouter.post('/upload', async (req: Request, res: Response) => {
   try {
     const { filename, dataBase64, dateTaken, location, albumId, mimeType } = req.body;
+    const userId = (req.headers['x-user-id'] as string) || (req.body.userId as string) || 'user_default';
     if (!dataBase64 || !filename) {
       return res.status(400).json({ error: 'Photo data and filename are required' });
     }
@@ -65,13 +67,14 @@ photosRouter.post('/upload', async (req: Request, res: Response) => {
       filename,
       dataBase64,
       mimeType || 'image/jpeg',
-      dateTaken
+      dateTaken,
+      userId
     );
 
     // Step 2: Create initial photo record in Firestore with status PROCESSING
     const initialPhoto: Photo = {
       id: photoId,
-      userId: 'user_default',
+      userId,
       filename,
       storagePath: stored.storagePath,
       thumbnailPath: stored.thumbnailPath,
@@ -126,7 +129,7 @@ photosRouter.post('/upload', async (req: Request, res: Response) => {
         // Store in Vertex AI Vector Search
         await vectorSearchService.upsertVector({
           id: photoId,
-          userId: 'user_default',
+          userId,
           vector,
           metadata: {
             dateTaken: initialPhoto.dateTaken,

@@ -10,8 +10,11 @@ import {
   HardDrive,
   Database,
   Presentation,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { SystemStatus } from '../types.js';
+import { AuthUser } from './AuthModal.js';
 
 export type ActiveTab = 'photos' | 'favorites' | 'albums' | 'recent' | 'trash' | 'storage';
 
@@ -23,6 +26,8 @@ interface SidebarProps {
   albumsCount: number;
   systemStatus: SystemStatus | null;
   onOpenPresentation?: () => void;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   albumsCount,
   systemStatus,
   onOpenPresentation,
+  currentUser,
+  onLogout,
 }) => {
   const navItems = [
     { id: 'photos' as ActiveTab, label: 'Photos', icon: Image },
@@ -152,11 +159,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-slate-500">Photo Store</span>
             <span className="font-medium text-blue-700 flex items-center gap-1">
               <HardDrive className="w-3 h-3 text-blue-600" />
-              Drive API ({systemStatus?.googleDriveActiveCount ?? 2} Pooled)
+              Drive API ({systemStatus?.googleDriveActiveCount ?? 1} Pooled)
             </span>
           </div>
         </div>
       </div>
+
+      {/* User Account Session Card */}
+      {currentUser && (
+        <div className="p-3 rounded-2xl neo-inset bg-white/60 border border-white/80 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {currentUser.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt={currentUser.displayName || 'User'}
+                className="w-7 h-7 rounded-xl object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {(currentUser.displayName || currentUser.email || 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">
+                {currentUser.displayName || 'User'}
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono truncate">
+                {currentUser.email}
+              </div>
+            </div>
+          </div>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="p-1.5 rounded-xl neo-btn text-slate-400 hover:text-rose-600 cursor-pointer shrink-0 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </aside>
   );
 };

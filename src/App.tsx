@@ -9,6 +9,8 @@ import { ArchitectureInspectorModal } from './components/ArchitectureInspectorMo
 import { SimilarPhotosModal } from './components/SimilarPhotosModal.js';
 import { StorageSettingsView } from './components/StorageSettingsView.js';
 import { PresentationDeck } from './components/presentation/PresentationDeck.js';
+import { AuthModal, AuthUser } from './components/AuthModal.js';
+import { LandingPage } from './components/LandingPage.js';
 import { Photo, Album, SearchResponse, SystemStatus } from './types.js';
 import { ArrowLeft, RefreshCw, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 
@@ -17,6 +19,19 @@ export default function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('pixsort_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
 
   // Presentation Deck Mode state
   const [isPresentationMode, setIsPresentationMode] = useState<boolean>(() => {
@@ -54,8 +69,83 @@ export default function App() {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // Load photos based on current context
+  // Listen for Firebase Auth state changes
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      try {
+        const configRes = await fetch('/api/drive/config');
+        if (configRes.ok) {
+          const config = await configRes.json();
+          const { initializeApp, getApps } = await import('firebase/app');
+          const { getAuth, onAuthStateChanged } = await import('firebase/auth');
+          const apps = getApps();
+          const app = apps.length > 0 ? apps[0] : initializeApp(config);
+          const auth = getAuth(app);
+          unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+              const u: AuthUser = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email?.split('@')[0] || 'User',
+                photoURL: user.photoURL,
+              };
+              setCurrentUser(u);
+              try {
+                localStorage.setItem('pixsort_user', JSON.stringify(u));
+              } catch {
+                // ignore
+              }
+            }
+          });
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const handleAuthSuccess = (user: AuthUser) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('pixsort_user', JSON.stringify(user));
+    } catch {
+      // ignore
+    }
+    showToast(`Welcome, ${user.displayName || user.email}!`);
+  };
+
+  const handleLogout = async () => {
+    try {
+      const configRes = await fetch('/api/drive/config');
+      if (configRes.ok) {
+        const config = await configRes.json();
+        const { initializeApp, getApps } = await import('firebase/app');
+        const { getAuth, signOut } = await import('firebase/auth');
+        const apps = getApps();
+        const app = apps.length > 0 ? apps[0] : initializeApp(config);
+        const auth = getAuth(app);
+        await signOut(auth);
+      }
+    } catch {
+      // ignore
+    }
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('pixsort_user');
+    } catch {
+      // ignore
+    }
+    showToast('Logged out successfully');
+  };
+
+  // Load photos based on current context and user
   const loadPhotos = useCallback(async () => {
+    if (!currentUser && !isPresentationMode) return;
     try {
       let url = '/api/photos';
       const params = new URLSearchParams();
@@ -72,7 +162,9 @@ export default function App() {
         url += `?${params.toString()}`;
       }
 
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const data: Photo[] = await res.json();
         if (activeTab === 'recent') {
@@ -84,12 +176,15 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load photos:', err);
     }
-  }, [activeTab, selectedAlbum]);
+  }, [activeTab, selectedAlbum, currentUser, isPresentationMode]);
 
   // Load albums
   const loadAlbums = useCallback(async () => {
+    if (!currentUser && !isPresentationMode) return;
     try {
-      const res = await fetch('/api/albums');
+      const res = await fetch('/api/albums', {
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setAlbums(data);
@@ -97,12 +192,14 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load albums:', err);
     }
-  }, []);
+  }, [currentUser, isPresentationMode]);
 
   // Load system status
   const loadSystemStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/system/status');
+      const res = await fetch('/api/system/status', {
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setSystemStatus(data);
@@ -110,14 +207,16 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load status:', err);
     }
-  }, []);
+  }, [currentUser]);
 
   // Initial fetch
   useEffect(() => {
-    loadPhotos();
-    loadAlbums();
-    loadSystemStatus();
-  }, [loadPhotos, loadAlbums, loadSystemStatus]);
+    if (currentUser) {
+      loadPhotos();
+      loadAlbums();
+      loadSystemStatus();
+    }
+  }, [currentUser, loadPhotos, loadAlbums, loadSystemStatus]);
 
   // Sync presentation mode with browser URL and history
   useEffect(() => {
@@ -165,7 +264,10 @@ export default function App() {
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+        },
         body: JSON.stringify({ query: q }),
       });
 
@@ -274,7 +376,10 @@ export default function App() {
   const handleToggleFavorite = async (photo: Photo, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/photos/${photo.id}/favorite`, { method: 'PATCH' });
+      const res = await fetch(`/api/photos/${photo.id}/favorite`, {
+        method: 'PATCH',
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const updated = await res.json();
         // Update local state
@@ -301,7 +406,10 @@ export default function App() {
     try {
       const res = await fetch(`/api/photos/${photo.id}/album`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+        },
         body: JSON.stringify({ albumId }),
       });
       if (res.ok) {
@@ -324,6 +432,7 @@ export default function App() {
     try {
       const res = await fetch(`/api/photos/${photo.id}?permanent=${isTrashTab}`, {
         method: 'DELETE',
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
       });
       if (res.ok) {
         setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
@@ -342,7 +451,10 @@ export default function App() {
   // Restore photo from trash
   const handleRestorePhoto = async (photo: Photo) => {
     try {
-      const res = await fetch(`/api/photos/${photo.id}/restore`, { method: 'PATCH' });
+      const res = await fetch(`/api/photos/${photo.id}/restore`, {
+        method: 'PATCH',
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
         showToast('Photo restored to library');
@@ -359,7 +471,10 @@ export default function App() {
     setSimilarModal({ source: photo, results: [], loading: true });
 
     try {
-      const res = await fetch(`/api/photos/${photo.id}/similar`, { method: 'POST' });
+      const res = await fetch(`/api/photos/${photo.id}/similar`, {
+        method: 'POST',
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setSimilarModal({
@@ -381,7 +496,10 @@ export default function App() {
   const handleCreateAlbum = async (name: string) => {
     const res = await fetch('/api/albums', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+      },
       body: JSON.stringify({ name }),
     });
     if (res.ok) {
@@ -392,7 +510,10 @@ export default function App() {
 
   // Delete album
   const handleDeleteAlbum = async (albumId: string) => {
-    const res = await fetch(`/api/albums/${albumId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/albums/${albumId}`, {
+      method: 'DELETE',
+      headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+    });
     if (res.ok) {
       if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
       loadAlbums();
@@ -405,6 +526,49 @@ export default function App() {
 
   if (isPresentationMode) {
     return <PresentationDeck onExit={handleExitPresentation} />;
+  }
+
+  // If not logged in, display the Landing Homepage with interactive demo and AuthModal
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#EEF2F6] text-slate-800 font-sans">
+        {/* Toast Notification */}
+        {notification && (
+          <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-2xl neo-raised-lg bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-3 duration-200">
+            <AlertCircle className="w-4 h-4 text-blue-400" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+        <LandingPage
+          onOpenAuth={(mode) => {
+            setAuthModalMode(mode);
+            setShowAuthModal(true);
+          }}
+          onOpenPresentation={handleOpenPresentation}
+          onExploreGuest={() => {
+            const guestUser: AuthUser = {
+              uid: 'guest_' + Date.now(),
+              email: 'guest@pixsort.local',
+              displayName: 'Guest Explorer',
+              photoURL: null,
+              isGuest: true,
+            };
+            handleAuthSuccess(guestUser);
+          }}
+        />
+
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(u) => {
+            setShowAuthModal(false);
+            handleAuthSuccess(u);
+          }}
+          initialMode={authModalMode}
+        />
+      </div>
+    );
   }
 
   return (
@@ -428,6 +592,8 @@ export default function App() {
         onOpenPresentation={handleOpenPresentation}
         systemStatus={systemStatus}
         isSearching={isSearching}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Layout Area */}
@@ -445,6 +611,8 @@ export default function App() {
           albumsCount={albums.length}
           systemStatus={systemStatus}
           onOpenPresentation={handleOpenPresentation}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         {/* Center Gallery & Content */}
@@ -485,6 +653,7 @@ export default function App() {
                 loadSystemStatus();
                 loadPhotos();
               }}
+              currentUser={currentUser}
             />
           ) : activeTab === 'albums' && !selectedAlbum ? (
             <AlbumsView
@@ -603,6 +772,7 @@ export default function App() {
             loadSystemStatus();
             showToast('Photo uploaded and indexed into Vertex AI Vector Search');
           }}
+          currentUser={currentUser}
         />
       )}
 

@@ -9,10 +9,18 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
+  setLogLevel,
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
 import { Photo, Album } from '../../src/types.js';
+
+// Suppress repetitive gRPC connection retry spam when Firestore DB is not yet created
+try {
+  setLogLevel('error');
+} catch {
+  // ignore
+}
 
 let firestoreDb: Firestore | null = null;
 let firestoreProject: string | null = null;
@@ -23,7 +31,7 @@ try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     firestoreProject = config.projectId;
     const app = getApps().length > 0 ? getApp() : initializeApp(config);
-    if (config.firestoreDatabaseId) {
+    if (config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)') {
       firestoreDb = getFirestore(app, config.firestoreDatabaseId);
     } else {
       firestoreDb = getFirestore(app);
@@ -79,7 +87,12 @@ export class FirestoreDatabaseService {
       this.isFirestoreSynced = true;
       console.log('[Firestore] Cloud database synchronized.');
     } catch (err: any) {
-      console.warn('[Firestore] Sync notice:', err.message);
+      if (err.message?.includes('NOT_FOUND') || err.code === 'not-found' || err.message?.includes('not-found')) {
+        console.warn(`[Firestore] Notice: Cloud Firestore database has not been provisioned yet in project '${firestoreProject}'. PixSort will run in fast memory cache mode. To enable cloud persistence, click "Create database" at: https://console.firebase.google.com/project/${firestoreProject}/firestore`);
+        firestoreDb = null;
+      } else {
+        console.warn('[Firestore] Sync notice:', err.message);
+      }
     }
   }
 
@@ -264,15 +277,20 @@ export class FirestoreDatabaseService {
     return photo;
   }
 
-  getStats() {
-    const all = Array.from(this.photos.values());
+  getStats(userId?: string) {
+    const all = Array.from(this.photos.values()).filter(
+      (p) => !userId || p.userId === userId || p.userId === 'user_default'
+    );
+    const userAlbums = Array.from(this.albums.values()).filter(
+      (a) => !userId || a.userId === userId || a.userId === 'user_default'
+    );
     return {
       total: all.length,
       ready: all.filter((p) => p.processingStatus === 'READY').length,
       processing: all.filter((p) => p.processingStatus !== 'READY').length,
       trash: all.filter((p) => p.isTrash).length,
-      favorites: this.favorites.size,
-      albums: this.albums.size,
+      favorites: all.filter((p) => p.isFavorite).length,
+      albums: userAlbums.length,
       firestoreConnected: !!firestoreDb,
       firebaseProjectId: firestoreProject || undefined,
     };

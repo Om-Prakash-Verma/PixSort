@@ -6,7 +6,8 @@ export const albumsRouter = Router();
 // List albums
 albumsRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const albums = await dbService.getAlbums('user_default');
+    const userId = (req.headers['x-user-id'] as string) || (req.query.userId as string) || 'user_default';
+    const albums = await dbService.getAlbums(userId);
     res.json(albums);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -17,10 +18,11 @@ albumsRouter.get('/', async (req: Request, res: Response) => {
 albumsRouter.post('/', async (req: Request, res: Response) => {
   try {
     const { name } = req.body;
+    const userId = (req.headers['x-user-id'] as string) || (req.body.userId as string) || 'user_default';
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Album name is required' });
     }
-    const newAlbum = await dbService.createAlbum('user_default', name.trim());
+    const newAlbum = await dbService.createAlbum(userId, name.trim());
     res.status(201).json(newAlbum);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
