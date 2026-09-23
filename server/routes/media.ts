@@ -17,25 +17,24 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
   }
 
   // 2. Fetch associated photo record from database to find Google Drive references
-  const allPhotos = await dbService.getPhotos();
-  const photo = allPhotos.find(
-    (p) =>
-      p.url?.includes(filename) ||
-      p.thumbnailUrl?.includes(filename) ||
-      p.id === filename.replace(/\.[^/.]+$/, '') ||
-      p.filename === filename
-  );
+  const photo = dbService.getPhotoByFilenameOrId(filename);
 
   // 3. If photo has Google Drive account association, download from Google Drive
-  if (photo && photo.driveAccountId && photo.driveFileId) {
+  const driveAccountId = photo?.driveAccountId || 'drive_acc_om';
+  const driveFileId = photo?.driveFileId;
+  if (driveFileId) {
     try {
       const driveFile = await driveStorageService.downloadFile(
-        photo.driveAccountId,
-        photo.driveFileId,
+        driveAccountId,
+        driveFileId,
         filename
       );
       if (driveFile) {
-        fs.writeFileSync(localFilePath, driveFile.buffer);
+        try {
+          fs.writeFileSync(localFilePath, driveFile.buffer);
+        } catch {
+          // ignore
+        }
         res.setHeader('Content-Type', driveFile.mimeType || 'image/jpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.send(driveFile.buffer);
@@ -43,6 +42,19 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
     } catch (driveErr) {
       console.warn(`[Drive Media] Could not download file from Google Drive:`, driveErr);
     }
+  }
+
+  // Check if file is in managed Drive folder
+  const localDriveFile = await driveStorageService.downloadFile(driveAccountId, '', filename);
+  if (localDriveFile) {
+    try {
+      fs.writeFileSync(localFilePath, localDriveFile.buffer);
+    } catch {
+      // ignore
+    }
+    res.setHeader('Content-Type', localDriveFile.mimeType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(localDriveFile.buffer);
   }
 
   // 4. If it is an Unsplash sample photo (e.g. photo-1464863979621-258859e62245.avif)
