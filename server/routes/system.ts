@@ -10,6 +10,7 @@ export const systemRouter = Router();
 // System status
 systemRouter.get('/status', (req: Request, res: Response) => {
   const stats = dbService.getStats();
+  const cloudStorageStatus = storageService.getCloudStatus();
   const status: SystemStatus = {
     geminiEmbeddingModel: 'gemini-embedding-2-preview',
     hasGeminiKey: aiService.getHasKey(),
@@ -19,6 +20,8 @@ systemRouter.get('/status', (req: Request, res: Response) => {
     readyPhotosCount: stats.ready,
     processingCount: stats.processing,
     cloudStorageItems: storageService.getItemCount() + stats.total,
+    cloudStorageConnected: cloudStorageStatus.isConnected,
+    cloudStorageBucket: cloudStorageStatus.bucketName,
     firestoreConnected: stats.firestoreConnected,
     firebaseProjectId: stats.firebaseProjectId,
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Sparkles, MapPin, Calendar, Clock, Layers, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Photo } from '../types.js';
 
@@ -7,6 +7,9 @@ interface PhotoCardProps {
   onSelect: (photo: Photo) => void;
   onToggleFavorite: (photo: Photo, e: React.MouseEvent) => void;
   onFindSimilar: (photo: Photo, e: React.MouseEvent) => void;
+  isFocused?: boolean;
+  onCardFocus?: () => void;
+  tabIndex?: number;
 }
 
 export const PhotoCard: React.FC<PhotoCardProps> = ({
@@ -14,15 +17,45 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onSelect,
   onToggleFavorite,
   onFindSimilar,
+  isFocused = false,
+  onCardFocus,
+  tabIndex = 0,
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const isReady = photo.processingStatus === 'READY';
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll into view when focused via keyboard navigation
+  useEffect(() => {
+    if (isFocused && cardRef.current) {
+      cardRef.current.focus();
+      cardRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [isFocused]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(photo);
+    }
+  };
 
   return (
     <div
+      ref={cardRef}
+      role="button"
+      tabIndex={tabIndex}
+      aria-label={`Photo: ${photo.filename}. ${photo.aiDescription || ''}`}
+      aria-selected={isFocused}
       onClick={() => onSelect(photo)}
-      className="group relative cursor-pointer rounded-2xl neo-photo-card p-2 flex flex-col justify-between transition-all select-none"
+      onFocus={onCardFocus}
+      onKeyDown={handleKeyDown}
+      className={`group relative cursor-pointer rounded-2xl neo-photo-card p-2 flex flex-col justify-between transition-all select-none outline-none ${
+        isFocused
+          ? 'ring-2 ring-blue-600 ring-offset-2 ring-offset-[#EEF2F6] scale-[1.02] shadow-md neo-inset'
+          : 'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#EEF2F6]'
+      }`}
     >
       {/* Photo Frame Container */}
       <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden bg-slate-200">

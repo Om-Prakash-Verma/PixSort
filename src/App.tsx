@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header.js';
 import { Sidebar, ActiveTab } from './components/Sidebar.js';
 import { PhotoGrid } from './components/PhotoGrid.js';
@@ -29,6 +29,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResponse, setSearchResponse] = useState<SearchResponse | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const searchCacheRef = useRef<Map<string, SearchResponse>>(new Map());
 
   // Modals & view states
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
@@ -138,11 +139,24 @@ export default function App() {
     setIsPresentationMode(false);
   };
 
-  // Execute Natural Language Search via Gemini Embedding 2 + Vertex AI Vector Search
+  // Execute Natural Language Search (Zero-API with instant client-side cache)
   const handleExecuteSearch = async (query: string) => {
     const q = query.trim();
     if (!q) {
       setSearchResponse(null);
+      return;
+    }
+
+    const cacheKey = q.toLowerCase();
+
+    // 1. Instant cache lookup: If query was executed previously, return immediately with 0 network calls
+    if (searchCacheRef.current.has(cacheKey)) {
+      const cached = searchCacheRef.current.get(cacheKey)!;
+      setSearchResponse({
+        ...cached,
+        executionTimeMs: 0, // 0ms instantaneous cache hit
+      });
+      showToast(`Instant retrieval from local cache (0 API calls)`);
       return;
     }
 
@@ -156,6 +170,8 @@ export default function App() {
 
       if (res.ok) {
         const data: SearchResponse = await res.json();
+        // Save to client-side cache for instant re-runs
+        searchCacheRef.current.set(cacheKey, data);
         setSearchResponse(data);
       } else {
         const err = await res.json();
@@ -173,6 +189,85 @@ export default function App() {
     setSearchQuery('');
     setSearchResponse(null);
   };
+
+  // Global keyboard shortcuts (Esc to close modals / clear search, '/' to focus search bar)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement as HTMLElement | null;
+      const isInputFocused =
+        activeElement &&
+        (activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable);
+
+      // 1. "/" shortcut: Focus search bar when not typing in an input
+      if (e.key === '/' && !isInputFocused && !isPresentationMode) {
+        e.preventDefault();
+        const searchInput = document.getElementById('main-photo-search-input') as HTMLInputElement | null;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
+
+      // 2. "Escape" shortcut: Close open modals, or exit presentation, or clear/blur search
+      if (e.key === 'Escape') {
+        // If presentation mode is active, exit presentation mode
+        if (isPresentationMode) {
+          handleExitPresentation();
+          return;
+        }
+
+        // If similar photos modal is open, close it
+        if (similarModal.source) {
+          setSimilarModal({ source: null, results: [], loading: false });
+          return;
+        }
+
+        // If photo viewer modal is open, close it
+        if (selectedPhoto) {
+          setSelectedPhoto(null);
+          return;
+        }
+
+        // If upload modal is open, close it
+        if (showUploadModal) {
+          setShowUploadModal(false);
+          return;
+        }
+
+        // If architecture inspector modal is open, close it
+        if (showInspectorModal) {
+          setShowInspectorModal(false);
+          return;
+        }
+
+        // If search input or any other input is focused, blur it
+        if (isInputFocused && activeElement) {
+          activeElement.blur();
+          return;
+        }
+
+        // If search results are shown or search query is active, clear search
+        if (searchResponse || searchQuery) {
+          handleClearSearch();
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    isPresentationMode,
+    similarModal.source,
+    selectedPhoto,
+    showUploadModal,
+    showInspectorModal,
+    searchResponse,
+    searchQuery,
+  ]);
 
   // Toggle favorite
   const handleToggleFavorite = async (photo: Photo, e: React.MouseEvent) => {
