@@ -268,6 +268,25 @@ export class GoogleDriveStorageProvider {
   }
 
   /**
+   * Delete / remove a connected account completely from PixSort
+   */
+  public async deleteAccount(accountId: string): Promise<boolean> {
+    if (!this.accounts.has(accountId)) return false;
+
+    this.accounts.delete(accountId);
+    this.credentials.delete(accountId);
+
+    // Re-adjust priorities
+    const remaining = Array.from(this.accounts.values()).sort((a, b) => a.priority - b.priority);
+    remaining.forEach((acc, idx) => {
+      acc.priority = idx + 1;
+    });
+
+    this.saveAccountsToFile();
+    return true;
+  }
+
+  /**
    * Reorder accounts priority
    */
   public async reorderAccounts(accountIds: string[]): Promise<ConnectedDriveAccount[]> {

@@ -48,6 +48,10 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const [accountToDisconnect, setAccountToDisconnect] = useState<ConnectedDriveAccount | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
+  // Delete storage warning modal state
+  const [accountToDelete, setAccountToDelete] = useState<ConnectedDriveAccount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const fetchAccounts = async () => {
     try {
       setLoading(true);
@@ -129,6 +133,32 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
       console.error('Disconnect error:', err);
     } finally {
       setIsDisconnecting(false);
+    }
+  };
+
+  // Delete account confirmation
+  const handleConfirmDelete = async () => {
+    if (!accountToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/drive/accounts/${accountToDelete.id}`, {
+        method: 'DELETE',
+        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
+      });
+      if (res.ok) {
+        onNotify?.(`Storage account ${accountToDelete.googleAccountEmail} deleted.`);
+        setAccountToDelete(null);
+        await fetchAccounts();
+        onAccountsUpdated?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        onNotify?.(data.error || 'Failed to delete storage account.');
+      }
+    } catch (err) {
+      console.error('Delete storage error:', err);
+      onNotify?.('Failed to delete storage account.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -444,7 +474,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                       {isActive ? (
                         <button
                           onClick={() => setAccountToDisconnect(acc)}
-                          className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
                         >
                           Disconnect
                         </button>
@@ -457,6 +487,15 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                           <span>Reconnect</span>
                         </button>
                       )}
+
+                      <button
+                        onClick={() => setAccountToDelete(acc)}
+                        className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                        title="Delete Storage from PixSort"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
                     </div>
                   </div>
 
@@ -556,6 +595,64 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                   className="px-4 py-2 rounded-xl neo-btn text-xs font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
                 >
                   {isDisconnecting ? 'Disconnecting...' : 'Disconnect Account'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Storage Warning Modal */}
+      <AnimatePresence>
+        {accountToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl neo-raised-lg bg-[#EEF2F6] p-6 space-y-4 border border-white/80"
+            >
+              <div className="flex items-center gap-3 text-rose-600">
+                <div className="w-10 h-10 rounded-2xl neo-raised flex items-center justify-center text-rose-600 shrink-0">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900">Delete Google Drive Storage?</h3>
+                  <p className="text-xs text-slate-500 font-mono truncate">{accountToDelete.googleAccountEmail}</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl neo-inset bg-rose-50/50 border border-rose-200/60 text-xs text-rose-900 leading-relaxed">
+                <p className="font-semibold">
+                  This Google Drive storage account will be completely removed from your PixSort storage pool.
+                </p>
+                <div className="mt-2 pt-2 border-t border-rose-200/40 font-mono text-[11px] space-y-0.5">
+                  <div>Account details:</div>
+                  <div className="font-bold text-slate-800">
+                    {accountToDelete.photoCount} indexed photos • {formatBytes(accountToDelete.storageUsed)} used
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                <em>Note:</em> Your files inside your personal Google Drive account will <strong>NOT</strong> be deleted. Only the connection in PixSort will be removed.
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  disabled={isDeleting}
+                  onClick={() => setAccountToDelete(null)}
+                  className="px-4 py-2 rounded-xl neo-btn text-xs font-semibold text-slate-600 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={isDeleting}
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 rounded-xl neo-btn text-xs font-bold text-rose-600 hover:text-white hover:bg-rose-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeleting ? 'Deleting...' : 'Delete Storage'}</span>
                 </button>
               </div>
             </motion.div>

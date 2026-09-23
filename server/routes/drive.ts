@@ -228,6 +228,26 @@ driveRouter.post('/accounts/:id/disconnect', async (req: Request, res: Response)
 });
 
 /**
+ * DELETE /api/drive/accounts/:id
+ * Removes a connected Google Drive storage account
+ */
+driveRouter.delete('/accounts/:id', async (req: Request, res: Response) => {
+  try {
+    const success = await driveStorageService.deleteAccount(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: 'Drive account not found.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Google Drive storage account removed.',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/drive/accounts/:id/reconnect
  * Reactivates a disconnected account
  */
