@@ -22,6 +22,7 @@ systemRouter.get('/status', (req: Request, res: Response) => {
     cloudStorageItems: storageService.getItemCount() + stats.total,
     cloudStorageConnected: cloudStorageStatus.isConnected,
     cloudStorageBucket: cloudStorageStatus.bucketName,
+    cloudStorageProvisioned: cloudStorageStatus.isProvisioned,
     firestoreConnected: stats.firestoreConnected,
     firebaseProjectId: stats.firebaseProjectId,
   };
