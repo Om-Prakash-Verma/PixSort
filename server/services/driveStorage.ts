@@ -45,14 +45,22 @@ export class GoogleDriveStorageProvider {
   }
 
   private accountsFile = path.join(process.cwd(), 'data', 'drive_accounts.json');
+  private credentialsFile = path.join(process.cwd(), 'data', 'drive_credentials.json');
 
   private saveAccountsToFile() {
     try {
       const dir = path.dirname(this.accountsFile);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(this.accountsFile, JSON.stringify(Array.from(this.accounts.values()), null, 2));
+
+      // Safely persist credentials so OAuth tokens survive server restarts
+      const credsObj: Record<string, DriveAccountCredentials> = {};
+      for (const [id, c] of this.credentials.entries()) {
+        credsObj[id] = c;
+      }
+      fs.writeFileSync(this.credentialsFile, JSON.stringify(credsObj, null, 2));
     } catch (err) {
-      console.warn('[Drive Storage] Could not persist accounts to file:', err);
+      console.warn('[Drive Storage] Could not persist accounts/credentials to file:', err);
     }
   }
 
@@ -73,8 +81,16 @@ export class GoogleDriveStorageProvider {
           }
         }
       }
+
+      if (fs.existsSync(this.credentialsFile)) {
+        const rawCreds = fs.readFileSync(this.credentialsFile, 'utf-8');
+        const credsData = JSON.parse(rawCreds);
+        for (const [id, c] of Object.entries(credsData)) {
+          this.credentials.set(id, c as DriveAccountCredentials);
+        }
+      }
     } catch (err) {
-      console.warn('[Drive Storage] Error loading saved accounts:', err);
+      console.warn('[Drive Storage] Error loading saved accounts/credentials:', err);
     }
 
     // Default to the user's connected account if accounts is empty
@@ -452,6 +468,15 @@ export class GoogleDriveStorageProvider {
         }
 
         const driveFile = await res.json();
+        
+        // Cache uploaded file in public/uploads for immediate browser serving
+        const publicServePath = path.join(process.cwd(), 'public', 'uploads', params.filename);
+        try {
+          fs.writeFileSync(publicServePath, params.buffer);
+        } catch {
+          // ignore
+        }
+
         return { fileId: driveFile.id, folderId: folderId || 'drive_root' };
       } catch (driveApiErr: any) {
         console.warn('[Google Drive API] Remote API failed, using managed account storage:', driveApiErr?.message || driveApiErr);
@@ -586,21 +611,63 @@ export class GoogleDriveStorageProvider {
     }
 
     // 2. Fetch from Google Drive API if remote
-    const creds = this.credentials.get(accountId);
-    if (creds && creds.accessToken && !fileId.startsWith('drive_file_')) {
+    let activeToken = this.credentials.get(accountId)?.accessToken;
+    if (!activeToken) {
+      for (const cred of this.credentials.values()) {
+        if (cred.accessToken) {
+          activeToken = cred.accessToken;
+          break;
+        }
+      }
+    }
+
+    if (activeToken && !fileId.startsWith('drive_file_')) {
       try {
         const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-          headers: { Authorization: `Bearer ${creds.accessToken}` },
+          headers: { Authorization: `Bearer ${activeToken}` },
         });
         if (res.ok) {
           const arrayBuffer = await res.arrayBuffer();
-          return {
-            buffer: Buffer.from(arrayBuffer),
-            mimeType: res.headers.get('content-type') || 'image/jpeg',
-          };
+          const buffer = Buffer.from(arrayBuffer);
+          const mimeType = res.headers.get('content-type') || 'image/jpeg';
+          if (filename) {
+            const publicPath = path.join(process.cwd(), 'public', 'uploads', filename);
+            try {
+              fs.writeFileSync(publicPath, buffer);
+            } catch {
+              // ignore
+            }
+          }
+          return { buffer, mimeType };
         }
       } catch (err) {
         console.warn(`[Google Drive] Remote download failed for ${fileId}:`, err);
+      }
+    }
+
+    // 3. Search in local managed drive directory
+    if (filename) {
+      const findFileRecursive = (dir: string): string | null => {
+        if (!fs.existsSync(dir)) return null;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const found = findFileRecursive(fullPath);
+            if (found) return found;
+          } else if (entry.name === filename) {
+            return fullPath;
+          }
+        }
+        return null;
+      };
+
+      const foundPath = findFileRecursive(this.localStorageDir);
+      if (foundPath && fs.existsSync(foundPath)) {
+        return {
+          buffer: fs.readFileSync(foundPath),
+          mimeType: filename.endsWith('.png') ? 'image/png' : 'image/jpeg',
+        };
       }
     }
 

@@ -128,6 +128,23 @@ export class FirestoreDatabaseService {
     return this.photos.get(photoId) || null;
   }
 
+  getPhotoByFilenameOrId(identifier: string): Photo | null {
+    const clean = identifier.replace(/\.[^/.]+$/, '');
+    for (const p of this.photos.values()) {
+      if (
+        p.id === identifier ||
+        p.id === clean ||
+        p.filename === identifier ||
+        p.url?.includes(identifier) ||
+        p.thumbnailUrl?.includes(identifier) ||
+        p.driveFileId === identifier
+      ) {
+        return p;
+      }
+    }
+    return null;
+  }
+
   async createPhoto(photo: Photo): Promise<Photo> {
     this.photos.set(photo.id, photo);
     if (photo.isFavorite) {
