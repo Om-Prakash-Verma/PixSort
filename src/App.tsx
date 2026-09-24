@@ -531,7 +531,7 @@ export default function App() {
   // If not logged in, display the Landing Homepage with interactive demo and AuthModal
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#EEF2F6] text-slate-800 font-sans">
+      <div className="min-h-screen w-full overflow-y-auto bg-[#EEF2F6] text-slate-800 font-sans">
         {/* Toast Notification */}
         {notification && (
           <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-2xl neo-raised-lg bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-3 duration-200">
@@ -572,7 +572,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#EEF2F6] text-slate-800 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="h-screen w-screen overflow-hidden bg-[#EEF2F6] text-slate-800 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* Toast Notification */}
       {notification && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-2xl neo-raised-lg bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-3 duration-200">

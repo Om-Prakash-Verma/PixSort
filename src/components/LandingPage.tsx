@@ -96,7 +96,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-2.5">
             <button
               onClick={onOpenPresentation}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl neo-btn text-xs font-bold text-slate-700 hover:text-blue-700 cursor-pointer bg-white transition-all shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-blue-700 cursor-pointer bg-white transition-all shadow-xs border border-slate-200"
             >
               <PlayCircle className="w-3.5 h-3.5 text-blue-600" />
               <span className="hidden sm:inline">Presentation Deck</span>
@@ -105,14 +105,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <button
               onClick={() => onOpenAuth('signin')}
-              className="px-4 py-2 rounded-xl neo-btn text-xs font-bold text-slate-800 hover:text-blue-700 cursor-pointer bg-white transition-all shadow-xs"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-800 hover:text-blue-700 cursor-pointer bg-white transition-all shadow-xs border border-slate-200"
             >
               Sign In
             </button>
 
             <button
               onClick={() => onOpenAuth('signup')}
-              className="px-4 py-2 rounded-xl neo-btn text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-md shadow-blue-500/25 flex items-center gap-1.5"
             >
               <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -145,7 +145,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
             <button
               onClick={() => onOpenAuth('signup')}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl neo-btn text-sm font-black text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl text-sm font-black text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
             >
               <span>Create Free Account</span>
               <ArrowRight className="w-4 h-4" />
@@ -153,7 +153,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <button
               onClick={onExploreGuest}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl neo-btn text-sm font-bold text-slate-800 hover:text-blue-800 bg-white cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-sm font-bold text-slate-800 hover:text-blue-700 bg-white cursor-pointer transition-all shadow-xs border border-slate-200 hover:border-blue-300 flex items-center justify-center gap-2"
             >
               <span>Explore Demo as Guest</span>
             </button>
@@ -224,10 +224,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       folder: 'AI Photo Search/Photos/2026/09/',
                     });
                   }}
-                  className={`px-3 py-1 rounded-xl neo-btn text-xs font-medium cursor-pointer transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border ${
                     demoQuery === item.q
-                      ? 'bg-blue-600 text-white font-bold shadow-xs'
-                      : 'bg-white text-slate-700 hover:text-blue-700'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/30'
+                      : 'bg-white text-slate-700 border-slate-200 hover:text-blue-700 hover:border-blue-300 shadow-xs'
                   }`}
                 >
                   &ldquo;{item.q}&rdquo;
@@ -370,13 +370,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={() => onOpenAuth('signup')}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white text-blue-900 font-bold text-xs hover:bg-blue-50 cursor-pointer transition-all shadow-md"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white text-blue-900 font-bold text-xs hover:bg-blue-50 cursor-pointer transition-all shadow-md flex items-center justify-center gap-1.5"
             >
-              Get Started with Google Drive ➔
+              <span>Get Started with Google Drive</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onOpenAuth('signin')}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs cursor-pointer transition-all border border-white/20"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-blue-950/70 hover:bg-blue-950 text-white font-bold text-xs cursor-pointer transition-all border border-blue-400/40 shadow-sm"
             >
               Sign In to Existing Account
             </button>

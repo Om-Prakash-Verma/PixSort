@@ -319,7 +319,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl neo-btn flex items-center justify-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-sm disabled:opacity-50"
+              className="w-full py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-all shadow-md shadow-blue-500/25 disabled:opacity-50"
             >
               <span>{loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}</span>
               <ArrowRight className="w-3.5 h-3.5" />

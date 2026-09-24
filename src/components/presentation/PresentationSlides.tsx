@@ -317,9 +317,9 @@ export const Slide2Pipeline: React.FC = () => {
     {
       num: '01',
       title: 'You Upload a Photo',
-      tech: 'Google Drive API (Auto-Allocated)',
-      simple: 'Upload any photo. The system allocates storage across your connected Google Drive accounts with automatic failover and creates instant previews.',
-      analogy: 'Like storing photos safely in your own personal cloud lockbox.',
+      tech: 'Google Drive API (Auto-Allocated & Streamed)',
+      simple: 'Upload any photo. The system allocates storage across connected Google Drive accounts with priority failover, mirrors local cache, and streams binaries directly.',
+      analogy: 'Stored securely in your personal Google Drive cloud lockbox with zero hosting fee.',
       latency: '~35 ms',
     },
     {
@@ -333,17 +333,17 @@ export const Slide2Pipeline: React.FC = () => {
     {
       num: '03',
       title: 'Dense Vector Projection',
-      tech: '768-D Semantic Space (Vertex AI Principles)',
-      simple: 'Converts the visual narrative into a normalized dense vector fingerprint, mapping concepts into an organized coordinate space.',
+      tech: '3072-D Semantic Space (Gemini Embedding 2)',
+      simple: 'Converts the visual narrative into a 3072-dimensional normalized dense vector fingerprint, mapping concepts into an organized coordinate space.',
       analogy: 'Like assigning a unique GPS coordinate of meaning.',
       latency: '~2 ms',
     },
     {
       num: '04',
-      title: 'Zero-API Instant Search',
-      tech: 'Local Hybrid Ranking & Firestore NoSQL',
-      simple: 'Queries run completely locally without making external API calls ($0 budget consumed, ~3ms latency) with 95%+ precision.',
-      analogy: 'Filed into an instant photographic memory with zero recurring cost.',
+      title: 'Zero-API Search & Isolation',
+      tech: 'Local Hybrid Ranking & Multi-Tenant Isolation',
+      simple: 'Queries execute locally in ~3ms ($0 API cost), filtered strictly to the authenticated user with Firestore Security Rules protecting every record.',
+      analogy: 'Instant photographic memory with strict multi-tenant privacy.',
       latency: '~3 ms',
     },
   ];
@@ -535,10 +535,10 @@ export const Slide4Objectives: React.FC = () => {
         {[
           {
             id: 'GOAL 1',
-            title: 'Effortless Photo Upload',
-            simple: 'Upload any picture with instant preview and safe cloud storage. No delays, no complicated menus.',
-            techSpecs: 'Streaming Express Multipart · WebP compression · SHA-256 integrity verification.',
-            badge: '100% Zero-Touch',
+            title: 'Multi-Drive Pooling & Direct Stream',
+            simple: 'Upload any photo with auto-allocation across personal Google Drives, priority failover, direct streaming, and account deletion control.',
+            techSpecs: 'Google Drive REST API v3 · Priority failover · Multi-account pooling · Base64/Multipart stream.',
+            badge: 'Multi-Drive Pool',
           },
           {
             id: 'GOAL 2',
@@ -550,15 +550,15 @@ export const Slide4Objectives: React.FC = () => {
           {
             id: 'GOAL 3',
             title: 'Multimodal Dense Vector Mapping',
-            simple: 'Maps scenes and natural queries into aligned high-dimensional mathematical coordinate spaces with harmonic subspace activations.',
-            techSpecs: '768-D normalized dense embeddings · Vertex AI Vector Search geometric principles.',
-            badge: '768 Dimensions',
+            simple: 'Maps visual scenes and natural text queries into aligned high-dimensional mathematical coordinate spaces with harmonic subspace activations.',
+            techSpecs: '3072-D normalized dense embeddings · Gemini Embedding 2 · Vertex AI vector principles.',
+            badge: '3072 Dimensions',
           },
           {
             id: 'GOAL 4',
-            title: 'Zero-API Search & Budget Guard',
-            simple: 'Search through personal memories without consuming external API keys or paying per search query. Works 100% offline.',
-            techSpecs: 'Local hybrid ranker · Cosine similarity · Sub-5ms search execution ($0 API cost).',
+            title: 'Zero-API Search & Multi-Tenant Guard',
+            simple: 'Instant search without query fees ($0 cost, ~3ms latency), protected by Firebase Auth and Cloud Firestore per-user security rules.',
+            techSpecs: 'Local hybrid ranker · Cosine similarity · x-user-id token boundaries · Firestore Rules.',
             badge: '0 API Calls ($0 Cost)',
           },
         ].map((item, idx) => (
@@ -732,31 +732,31 @@ export const Slide6TechStack: React.FC = () => {
   const layers = [
     {
       tier: 'TIER 1',
-      title: 'User Interface (The Face)',
+      title: 'User Interface & Simulator (The Face)',
       tech: 'Next.js / React 19 · TypeScript · Tailwind CSS',
-      role: 'What the user sees and interacts with.',
-      details: 'Clean responsive photo gallery, search bar with instant feedback, connected storage dashboard, and full keyboard navigation (arrows, spacebar, esc).',
+      role: 'Landing page, interactive AI search simulator, and photo gallery.',
+      details: 'Hero landing page with live interactive search simulator, dual-mode auth modals, connected storage dashboard, and full keyboard navigation (arrows, spacebar, esc).',
     },
     {
       tier: 'TIER 2',
-      title: 'Authentication & Server (The Conductor)',
+      title: 'Authentication & Multi-Tenant Engine (The Conductor)',
       tech: 'Node.js 20 · Express · Firebase Auth · Google OAuth',
-      role: 'Handles user sessions and orchestrates cloud flows.',
-      details: 'Authorizes connected Google Drive accounts via secure OAuth 2.0 (drive.file scope), coordinates uploads with automatic failover, and handles image streams.',
+      role: 'Handles dual-mode authentication and multi-tenant request routing.',
+      details: 'Firebase 1-click Google Sign-in (drive.file scope) & Email/Password auth, x-user-id token boundaries, and managed Google Drive credentials persistence.',
     },
     {
       tier: 'TIER 3',
-      title: 'Multimodal AI & Vector Search (The Brain)',
-      tech: 'Gemini 2.5 Flash · Gemini Embeddings · Vertex AI',
-      role: 'Vision comprehension and high-dimensional semantic search.',
-      details: 'Gemini extracts rich scene stories at ingestion. Gemini Embeddings & Vertex AI vector search calculate continuous cosine similarity to find memories by conversational meaning.',
+      title: 'Multimodal AI & 3072-D Vector Search (The Brain)',
+      tech: 'Gemini 2.5 Flash · Gemini Embedding 2 (3072-D) · Vertex AI',
+      role: 'Multimodal scene comprehension and zero-API vector search.',
+      details: 'Gemini 2.5 Flash extracts rich scene narratives and metadata at ingestion. Gemini Embedding 2 generates 3072-D dense embeddings for instant sub-3ms local cosine ranking ($0 search cost).',
     },
     {
       tier: 'TIER 4',
-      title: 'Pooled Storage & Metadata (The Vault)',
-      tech: 'Google Drive API (Multi-Account) + Firestore NoSQL',
-      role: 'Decentralized personal storage with centralized indexing.',
-      details: 'Photos remain in user\'s own Google Drive accounts with automatic capacity failover. Firestore maintains rich document metadata, album tags, and Drive file pointers.',
+      title: 'Pooled Storage & Firestore Security Rules (The Vault)',
+      tech: 'Google Drive REST API v3 + Cloud Firestore NoSQL',
+      role: 'Multi-account Drive pooling with strict per-user database security rules.',
+      details: 'Direct Drive v3 streaming (files.get?alt=media) with quota failover, priority reordering, safe disconnect, and storage deletion. Firestore enforces strict per-user security rules (pixsort-62b7b).',
     },
   ];
 
@@ -815,7 +815,7 @@ export const Slide6TechStack: React.FC = () => {
       <div className={`p-3 rounded-xl border text-xs font-mono text-center ${
         isDark ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
       }`}>
-        Next.js / React • TypeScript • Firebase Authentication • Firestore • Google Drive API • Gemini • Gemini Embeddings • Vertex AI / Vector Search
+        Next.js / React 19 • TypeScript • Firebase Dual-Mode Auth • x-user-id Tenant Isolation • Cloud Firestore Rules • Google Drive API v3 (Direct Stream &amp; Deletion) • Gemini 2.5 Flash • 3072-D Gemini Embedding 2 • Vertex AI
       </div>
     </div>
   );
@@ -851,45 +851,45 @@ export const Slide7Architecture: React.FC = () => {
         }`}>
           <div className="flex items-center justify-between text-xs font-mono">
             <span className={`font-bold uppercase ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-              End-to-End Pipeline: From User to Multi-Drive & AI
+              End-to-End Pipeline: Multi-Tenant Auth, Pooled Storage & AI
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
-              Automatic Storage Failover
+              Automatic Failover &amp; Direct Stream
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center font-mono text-[11px]">
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">1. User</div>
-              <div className="text-[9px] text-slate-500">Selects photo</div>
+              <div className="font-bold text-slate-800">1. User &amp; Landing</div>
+              <div className="text-[9px] text-slate-500">Demo Simulator</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">2. App</div>
-              <div className="text-[9px] text-slate-500">React / Next.js</div>
+              <div className="font-bold text-slate-800">2. Firebase Auth</div>
+              <div className="text-[9px] text-slate-500">Google / Password</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">3. OAuth</div>
-              <div className="text-[9px] text-slate-500">Google OAuth 2.0</div>
+              <div className="font-bold text-slate-800">3. x-user-id</div>
+              <div className="text-[9px] text-slate-500">Tenant Isolation</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-indigo-950/40 border-indigo-800' : 'bg-indigo-50 border-indigo-200'}`}>
               <div className="font-bold text-indigo-700">4. Drives Pool</div>
-              <div className="text-[9px] text-indigo-500">Drive A / B / C</div>
+              <div className="text-[9px] text-indigo-500">Connect / Delete</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-indigo-950/40 border-indigo-800' : 'bg-indigo-50 border-indigo-200'}`}>
-              <div className="font-bold text-indigo-700">5. Allocation</div>
-              <div className="text-[9px] text-indigo-500">Quota & Failover</div>
+              <div className="font-bold text-indigo-700">5. REST v3 Stream</div>
+              <div className="text-[9px] text-indigo-500">files.get?alt=media</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">6. Gemini</div>
+              <div className="font-bold text-slate-800">6. Gemini 2.5</div>
               <div className="text-[9px] text-slate-500">Vision Analysis</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">7. Vectors</div>
-              <div className="text-[9px] text-slate-500">Vertex AI Search</div>
+              <div className="font-bold text-slate-800">7. 3072-D Vectors</div>
+              <div className="text-[9px] text-slate-500">Sub-3ms Search</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-emerald-950/40 border-emerald-800' : 'bg-emerald-50 border-emerald-200'}`}>
-              <div className="font-bold text-emerald-700">8. Firestore</div>
-              <div className="text-[9px] text-emerald-600">Unified Metadata</div>
+              <div className="font-bold text-emerald-700">8. Firestore Rules</div>
+              <div className="text-[9px] text-emerald-600">Per-User Security</div>
             </div>
           </div>
         </div>
@@ -900,9 +900,9 @@ export const Slide7Architecture: React.FC = () => {
         }`}>
           <div className="flex items-center justify-between text-xs font-mono">
             <span className={`font-bold uppercase ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
-              Multi-Account Pooled Storage Architecture
+              Multi-Account Pooled Storage Lifecycle
             </span>
-            <span className="text-[10px] text-slate-400">One Unified Photo Library</span>
+            <span className="text-[10px] text-slate-400">Total Storage = N × 15 GB Pooled</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
@@ -914,38 +914,38 @@ export const Slide7Architecture: React.FC = () => {
                 <span className="text-[10px] px-1.5 rounded bg-blue-100 text-blue-700 font-bold">15 GB Quota</span>
               </div>
               <div className="text-[10px] text-slate-500 font-bold truncate">omprakashverma.in@gmail.com</div>
-              <div className="text-[10px] text-blue-700 font-semibold">Priority #1 ➔ Active Upload Destination</div>
+              <div className="text-[10px] text-blue-700 font-semibold">Priority #1 ➔ Direct REST v3 Stream (files.get?alt=media)</div>
             </div>
 
             <div className={`p-3 rounded-xl border space-y-1.5 ${
               isDark ? 'bg-slate-950 border-slate-800' : 'bg-emerald-50/50 border-emerald-200'
             }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800">🟢 Drive 2 (Secondary)</span>
+                <span className="font-bold text-slate-800">🟢 Drive 2 (Failover)</span>
                 <span className="text-[10px] px-1.5 rounded bg-emerald-100 text-emerald-700 font-bold">+15 GB Pooled</span>
               </div>
-              <div className="text-[10px] text-slate-500">Secondary Connected Account</div>
-              <div className="text-[10px] text-emerald-700 font-semibold">Priority #2 ➔ Automatic Failover Target</div>
+              <div className="text-[10px] text-slate-500 font-bold truncate">Automatic Quota Failover</div>
+              <div className="text-[10px] text-emerald-700 font-semibold">Priority Reordering &amp; Zero-Downtime Migration</div>
             </div>
 
             <div className={`p-3 rounded-xl border space-y-1.5 ${
               isDark ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50/50 border-indigo-200'
             }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800">📁 Folder Hierarchy</span>
-                <span className="text-[10px] px-1.5 rounded bg-indigo-100 text-indigo-700 font-bold">Chronological</span>
+                <span className="font-bold text-slate-800">⚙️ Lifecycle Controls</span>
+                <span className="text-[10px] px-1.5 rounded bg-rose-100 text-rose-700 font-bold">Safe Deletion</span>
               </div>
-              <div className="text-[10px] text-indigo-900 font-mono truncate">AI Photo Search/Photos/YYYY/MM/</div>
-              <div className="text-[10px] text-indigo-700 font-semibold">Thumbnails &amp; Full Photos Auto-Organized</div>
+              <div className="text-[10px] text-indigo-900 font-mono truncate">Connect · Reorder · Disconnect · Delete</div>
+              <div className="text-[10px] text-rose-600 font-semibold">Delete Storage: Safety modal confirms &amp; clears pool; remote Drive intact</div>
             </div>
           </div>
 
           <div className="text-xs text-slate-500 pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <em>UX Principle:</em> Photos stay inside the user&apos;s own Google Drive. Safe disconnection never deletes remote Drive files.
+              <em>Storage Principle:</em> Master photos stream directly from user&apos;s Google Drive accounts. Safe disconnection or storage deletion never deletes remote files in Drive.
             </div>
             <div className="text-[10px] font-mono text-emerald-700 font-bold">
-              Total Storage = N × 15 GB Pooled
+              Multi-Tenant Isolation: x-user-id &amp; Firestore Rules
             </div>
           </div>
         </div>
@@ -953,7 +953,7 @@ export const Slide7Architecture: React.FC = () => {
 
       {/* Footer */}
       <div className={`text-xs font-mono text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-        Slide 07 of 11 · Decentralized Personal Drive Storage with Centralized AI Search
+        Slide 07 of 11 · Decentralized Personal Drive Storage with Centralized AI Search &amp; Multi-Tenant Security
       </div>
     </div>
   );
@@ -986,31 +986,31 @@ export const Slide8Features: React.FC = () => {
         {[
           {
             icon: Search,
-            title: 'Conversational Photo Search',
-            whatItIs: 'Search like you are asking a friend.',
-            example: 'Try typing: "drinking coffee outside on a sunny day", "college id card", or "happy dinner with friends".',
-            benefit: 'No keywords or manual tags needed. Natural language search.',
+            title: 'Conversational Search & Live Simulator',
+            whatItIs: 'Search like you are asking a friend, with a live demo sandbox.',
+            example: 'Hero landing page features an interactive AI simulator with sample queries ("happy dinner with friends", "college id card", "drinking coffee outside").',
+            benefit: 'Zero keywords or manual tags needed; instantaneous semantic matching.',
           },
           {
             icon: Cloud,
-            title: 'Pooled Google Drive Storage',
-            whatItIs: 'Multi-account personal cloud pooling.',
-            example: 'Connect multiple personal Google Drive accounts (15 GB + 15 GB). PixSort pools them into one library with automatic capacity failover.',
-            benefit: 'Photos remain in user\'s own Drive. Safe disconnection never deletes files.',
+            title: 'Pooled Google Drive & Full Lifecycle',
+            whatItIs: 'Multi-account personal cloud pooling with direct streaming & deletion control.',
+            example: 'Pool multiple personal Google Drives (15 GB + 15 GB). Features REST v3 binary streaming (files.get?alt=media), priority failover, and Delete Storage modal.',
+            benefit: 'Photos remain in user\'s own Drive. Safe disconnection & deletion preserve remote files.',
           },
           {
-            icon: Eye,
-            title: 'Deep AI Scene Inspector',
-            whatItIs: 'See what the computer "sees" inside every photo.',
-            example: 'Click any photo to view the Gemini-generated description, dominant subjects, aesthetic mood, and Drive storage metadata.',
-            benefit: 'Total transparency into why the AI matched your photo.',
+            icon: ShieldCheck,
+            title: 'Dual-Mode Auth & Multi-Tenant Isolation',
+            whatItIs: 'Flexible login with strict per-user data protection.',
+            example: '1-click Google Sign-in popup (drive.file scope) and Email/Password registration. Multi-tenant request boundary enforced via x-user-id and Firestore Security Rules.',
+            benefit: 'Each user only accesses their own photo library, Drive accounts, and smart albums.',
           },
           {
             icon: FolderHeart,
-            title: 'Virtual Smart Albums & Safe Bin',
-            whatItIs: 'Zero-duplication memory organization.',
-            example: 'Group photos into "Favorites", "College", and "Family" simultaneously with zero extra storage used, protected by two-phase recovery.',
-            benefit: 'Instant grouping without duplicating files on Google Drive.',
+            title: 'Deep AI Scene Inspector & Smart Albums',
+            whatItIs: 'Complete AI vision transparency with zero-duplication organization.',
+            example: 'Click any photo to inspect Gemini 2.5 Flash scene breakdown, dominant subjects, aesthetic mood, and Drive metadata. Group photos into albums with 2-phase recovery bin.',
+            benefit: 'Instant grouping and complete explainability without duplicating files.',
           },
         ].map((feat, idx) => {
           const Icon = feat.icon;
@@ -1200,19 +1200,19 @@ export const Slide10Conclusion: React.FC = () => {
           <ul className={`space-y-2.5 text-xs sm:text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Manual Tagging is Obsolete:</strong> Proven that multimodal vision automatically categorizes raw photos with zero user fatigue.</span>
+              <span><strong>Multimodal AI Replaces Manual Tagging:</strong> Gemini 2.5 Flash + Gemini Embedding 2 (3072-D) automatically extract and index rich scene semantics with zero user fatigue.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Pooled Google Drive Architecture:</strong> User photos stay in their personal Google Drives with automatic multi-account capacity failover ($0 hosting overhead).</span>
+              <span><strong>Pooled Drive Full Lifecycle &amp; Direct Stream:</strong> User photos stay in personal Google Drives with REST v3 streaming (files.get?alt=media), automatic capacity failover, priority reordering, safe disconnect, and storage deletion ($0 hosting overhead).</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Zero-API Search & Budget Guard:</strong> Built a 100% local hybrid semantic search engine that costs $0 in API credits, runs in ~3ms, and needs 0 cloud queries.</span>
+              <span><strong>Dual-Mode Auth &amp; Strict Tenant Isolation:</strong> Firebase Auth (Google 1-click &amp; Email/Password), x-user-id request verification, and Cloud Firestore Security Rules guarantee cross-user privacy.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Production-Ready Reliability:</strong> Cloud Firestore persistence (<code className="font-mono text-xs">pixsort-62b7b</code>), thumbnail optimization, and resilient offline cache.</span>
+              <span><strong>Zero-API Search &amp; Production Budget Guard:</strong> Built a 100% local hybrid semantic search engine that costs $0 in search API credits, executes in ~3ms, and operates with zero cloud query overhead.</span>
             </li>
           </ul>
         </div>
