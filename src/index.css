@@ -40,6 +40,7 @@
   /* Interactive Button with Soft Click State */
   .neo-btn {
     background-color: #EEF2F6;
+    color: #1E293B;
     box-shadow: 4px 4px 10px #d3dbe7, -4px -4px 10px #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.7);
     transition: all 0.15s ease;
@@ -51,6 +52,26 @@
 
   .neo-btn:active, .neo-btn-active {
     box-shadow: inset 3px 3px 6px #d0d8e4, inset -3px -3px 6px #ffffff;
+  }
+
+  /* Vibrant Solid Primary Button (Guarantees White Text on Blue Background) */
+  .neo-btn-primary {
+    background-color: #2563EB !important;
+    color: #ffffff !important;
+    box-shadow: 4px 4px 14px rgba(37, 99, 235, 0.35), -2px -2px 8px #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.15s ease;
+  }
+
+  .neo-btn-primary:hover {
+    background-color: #1D4ED8 !important;
+    color: #ffffff !important;
+    box-shadow: 5px 5px 16px rgba(29, 78, 216, 0.45), -2px -2px 10px #ffffff;
+  }
+
+  .neo-btn-primary:active {
+    background-color: #1E40AF !important;
+    box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.25);
   }
 
   /* Photo Frame Neomorphism */
@@ -70,6 +91,8 @@
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background-color: #EEF2F6;
-  overflow: hidden;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 

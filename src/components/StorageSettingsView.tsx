@@ -755,7 +755,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                     <button
                       type="submit"
                       disabled={isConnecting || !customEmail}
-                      className="px-5 py-2 rounded-xl neo-btn text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+                      className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/25"
                     >
                       {isConnecting ? 'Connecting...' : 'Connect Google Drive'}
                     </button>
