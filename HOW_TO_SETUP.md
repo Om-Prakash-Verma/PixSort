@@ -15,28 +15,32 @@ This guide walks through every step required to configure, run locally, connect 
 8. [Step 6: Firebase Authentication Setup](#8-step-6-firebase-authentication-setup)
 9. [Step 7: Local Development Server](#9-step-7-local-development-server)
 10. [Step 8: Connecting Personal Google Drive Storage](#10-step-8-connecting-personal-google-drive-storage)
-11. [Step 9: Production Build & Deployment](#11-step-9-production-build--deployment)
-12. [Troubleshooting & FAQs](#12-troubleshooting--faqs)
+11. [Step 9: Storage Lifecycle & Deletion Controls](#11-step-9-storage-lifecycle--deletion-controls)
+12. [Step 10: Production Build & Deployment](#12-step-10-production-build--deployment)
+13. [Step 11: Accessing the Capstone Defense Deck & Speech Script](#13-step-11-accessing-the-capstone-defense-deck--speech-script)
+14. [Troubleshooting & FAQs](#14-troubleshooting--faqs)
 
 ---
 
 ## 1. Architecture Overview
 
 PixSort is a modern personal photo management and multimodal semantic search system built on Google Cloud services:
-- **Vision & Scene Intelligence**: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
-- **Semantic Embeddings & Vector Math**: Gemini Embedding 2 (`gemini-embedding-2-preview`) & Vertex AI vector search principles
-- **Decentralized Storage**: Google Drive API v3 (pooled across personal Google accounts with dynamic capacity failover)
-- **Centralized Metadata & Sync**: Google Cloud Firestore NoSQL
-- **Frontend**: React 19 + TypeScript + Tailwind CSS (Clay Neomorphic `#EEF2F6` theme)
+- **Vision Intelligence**: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+- **Semantic Vector Space**: Gemini Embedding 2 (`gemini-embedding-2-preview`) producing **3072-dimensional** dense vectors
+- **Zero-API Search**: Sub-3ms in-memory cosine ranking ($0 search API cost)
+- **Decentralized Storage**: Google Drive REST API v3 streaming (`files.get?alt=media`) pooled across personal Google accounts
+- **Database & Sync**: Google Cloud Firestore NoSQL (`pixsort-62b7b`) with per-user security rules
+- **Identity & Auth**: Firebase Dual-Mode Authentication (Google 1-click `drive.file` popup + Email/Password)
+- **Frontend UI**: React 19 + TypeScript + Tailwind CSS (Clay Neomorphic `#EEF2F6` theme)
 - **Backend Server**: Node.js + Express bound to `0.0.0.0:3000`
 
 ---
 
 ## 2. Prerequisites
 
-Ensure you have the following installed on your machine:
-- **Node.js**: v18.0.0 or higher (v20+ recommended)
-- **npm**: v9.0.0 or higher
+Ensure you have the following installed:
+- **Node.js**: v20+ recommended (v18+ supported)
+- **npm**: v9+
 - **Git**
 - A **Google Account** (to access Google Cloud Console and Firebase)
 
@@ -56,7 +60,7 @@ npm install
 
 1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
 2. Click **Create API Key**.
-3. Create a `.env` file in the root directory (copy from `.env.example` if available) and add your key:
+3. Create a `.env` file in the root directory and add your key:
 
 ```env
 GEMINI_API_KEY="AIzaSyYourGeminiApiKeyHere"
@@ -69,10 +73,8 @@ PORT=3000
 
 1. Open the [Firebase Console](https://console.firebase.google.com/).
 2. Click **Add project** (or select your existing project e.g. `pixsort-62b7b`).
-3. Follow the prompts to create the project.
-4. Go to **Project Settings** (gear icon next to Project Overview).
-5. Under **Your apps**, click the **Web** icon (`</>`) to register a web application.
-6. Copy the `firebaseConfig` object and ensure your `firebase-applet-config.json` in the project root matches:
+3. Under **Project Settings** ➔ **General** ➔ **Your apps**, click the **Web** icon (`</>`) to register a web application.
+4. Copy the `firebaseConfig` object and ensure your `firebase-applet-config.json` in the project root matches:
 
 ```json
 {
@@ -92,10 +94,10 @@ PORT=3000
 
 ## 6. Step 4: Enable Google Drive API
 
-For PixSort to store and retrieve photos directly inside Google Drive:
+For PixSort to pool storage and stream photos directly from Google Drive:
 
 1. Visit the Google Cloud Console API Library for your project:
-   👉 **[Enable Google Drive API](https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=68321745770)**
+   👉 **[Enable Google Drive API](https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=68321745770)**  
    *(Replace `68321745770` with your Google Cloud Project Number if using another project).*
 2. Click the blue **ENABLE** button.
 
@@ -106,40 +108,43 @@ For PixSort to store and retrieve photos directly inside Google Drive:
 ### Create Database
 1. In the [Firebase Console](https://console.firebase.google.com/project/pixsort-62b7b/firestore), select **Firestore Database**.
 2. Click **Create database**.
-3. Choose a cloud location nearest to you (e.g. `asia-south1` or `nam5 (us-central)`).
-4. Select **Start in test mode** and click **Create**.
+3. Choose a cloud location nearest to you (e.g. `asia-south1` or `us-central1`).
+4. Select **Start in test mode** during initial setup.
 
-### Publish Security Rules
-Go to the **Rules** tab in Firestore and paste the following rules:
+### Production Multi-Tenant Security Rules
+Go to the **Rules** tab in Firestore and paste the production rules from `firestore.rules`:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Check if user is logged in
-    function isAuthenticated() {
-      return request.auth != null;
+    // Multi-tenant check
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Photos Collection
+    // Photos Collection (Strict User Isolation)
     match /photos/{photoId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Albums Collection
     match /albums/{albumId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Connected Google Drive Accounts
     match /drive_accounts/{accountId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Users Collection
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if isOwner(userId);
     }
   }
 }
@@ -150,92 +155,78 @@ Click **Publish**.
 
 ## 8. Step 6: Firebase Authentication Setup
 
-To allow users to sign in and maintain private photo collections:
-
 1. In the Firebase Console, go to **Authentication** ➔ **Sign-in method**.
-2. Click **Get Started** if you haven't enabled it yet.
-3. Enable the following providers:
+2. Enable the following providers:
    - **Google**: Click Google, switch the toggle to **Enable**, choose your Project Support Email, and click **Save**.
    - **Email/Password**: Click Email/Password, enable **Email/Password**, and click **Save**.
-4. Go to **Authentication** ➔ **Settings** ➔ **Authorized domains**.
-   - Ensure `localhost` is listed (Firebase adds it by default).
-   - If deploying to a custom domain (e.g. `pixsort.com`), add it here.
+3. Go to **Authentication** ➔ **Settings** ➔ **Authorized domains**.
+   - Ensure `localhost` is listed.
+   - If deploying to a production domain (e.g. `pixsort.com`), add it here.
 
 ---
 
 ## 9. Step 7: Local Development Server
 
-Start the development server with live reload:
+Start the development server:
 
 ```bash
 npm run dev
 ```
 
-The app will start on port `3000`:
-- **URL**: `http://localhost:3000`
-- Open your browser and navigate to `http://localhost:3000`.
+The application will bind to `0.0.0.0:3000`:
+- Open **`http://localhost:3000`** in your browser.
+- You will see the **Hero Landing Page** with the **Live Interactive AI Search Simulator**.
+- Try clicking the sample prompts (*"happy dinner with friends"*, *"college id card"*, *"sunset on the beach"*) to see instant sub-3ms cosine vector matching before signing in.
 
 ---
 
 ## 10. Step 8: Connecting Personal Google Drive Storage
 
-1. Open PixSort in your browser.
-2. If not logged in, click **Sign In** (via Google or Email).
-3. Navigate to **Connected Storage** in the left sidebar.
-4. Click **`+ Connect Google Drive`**.
-5. Click **Sign in with Google Account** or enter your Google Drive email.
-6. Your account will appear with its **15 GB** personal Drive quota.
-7. You can connect multiple Google Drive accounts. PixSort will automatically pool them and route new uploads using capacity failover!
+1. Click **Sign In** (or **Explore Demo as Guest**) on the homepage.
+2. Navigate to **Connected Storage** in the sidebar.
+3. Click **`+ Connect Google Drive`**.
+4. Authenticate using Google OAuth popup (grants fine-grained `drive.file` scope).
+5. The account will appear with its **15 GB** personal Drive quota.
+6. Connect additional accounts to expand your storage pool ($N \times 15\text{ GB}$).
 
-### Google Drive Folder Organization
-In your Google Drive, photos are stored in:
-```text
-My Drive/
-└── AI Photo Search/
-    ├── Photos/
-    │   └── YYYY/
-    │       └── MM/
-    │           └── <photo-id>.jpg
-    └── Thumbnails/
-        └── <photo-id>.jpg
-```
+### Understanding the `data/` Directory
+The backend server stores connected account metadata and OAuth tokens locally in:
+- `data/drive_accounts.json` (account quota and priority)
+- `data/drive_credentials.json` (OAuth access tokens)
+
+> **Why are credentials stored here instead of Firestore?**  
+> Google Drive OAuth tokens permit reading and writing to the user's Drive. Exposing raw OAuth tokens to client-side Firestore documents would be a security vulnerability. Storing them strictly on the server in `data/` guarantees they are never exposed to browser clients.
 
 ---
 
-## 11. Step 9: Production Build & Deployment
+## 11. Step 9: Storage Lifecycle & Deletion Controls
 
-### Build Command
-Compile the client application and bundle the Express server:
+In **Storage Settings**, users have complete lifecycle control:
+- **Priority Reordering**: Use arrow buttons to change which Drive receives new uploads first.
+- **Automatic Capacity Failover**: If Drive #1 has less available space than the uploaded file size, PixSort seamlessly routes the upload to Drive #2.
+- **Safe Disconnection**: Deactivates the account in PixSort without deleting any files from Google Drive.
+- **Delete Storage**: Click the red **"Delete Storage"** button. A safety confirmation modal appears. Deleting an account removes its registration and credentials from `data/`, leaving the user's master photos safe in Google Drive.
 
+---
+
+## 12. Step 10: Production Build & Deployment
+
+### Compile Production Build
 ```bash
 npm run build
 ```
-
-This generates:
-- `dist/index.html` and static client assets
-- `dist/server.cjs` (bundled standalone Node.js server)
+This builds:
+- `dist/index.html` and bundled client assets via Vite
+- `dist/server.cjs` bundled backend server via esbuild
 
 ### Start Production Server
 ```bash
 npm start
 ```
 
-### Deploying to Cloud Run (Google Cloud)
-1. Build a container using Docker:
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY dist ./dist
-COPY public ./public
-COPY firebase-applet-config.json ./
-ENV PORT=3000
-EXPOSE 3000
-CMD ["node", "dist/server.cjs"]
-```
-2. Deploy to Google Cloud Run:
+### Deploying to Google Cloud Run
 ```bash
+# Build container image and deploy
 gcloud run deploy pixsort \
   --source . \
   --region asia-south1 \
@@ -245,18 +236,25 @@ gcloud run deploy pixsort \
 
 ---
 
-## 12. Troubleshooting & FAQs
+## 13. Step 11: Accessing the Capstone Defense Deck & Speech Script
 
-### Error: `Google Drive API has not been used in project... or it is disabled (403)`
-**Solution**: Enable the Google Drive API in Google Cloud Console:
-👉 [Click here to enable Google Drive API](https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=68321745770)
+1. **Built-in Presentation Deck**:
+   - Access via the **"Presentation Deck"** / **"PPT"** button in the top navigation or sidebar.
+   - Or open directly in your browser: `http://localhost:3000/#/presentation`.
+   - Features 11 complete slides covering team credentials, problem statement, multimodal vectors, architecture, and benchmarks.
+   - Supports light/dark mode and full keyboard controls (arrow keys, spacebar, Esc).
+2. **Complete Defense Speech Script**:
+   - Refer to [`PROJECT_PRESENTATION_SPEECH.txt`](./PROJECT_PRESENTATION_SPEECH.txt) for the full 10-12 minute word-for-word presentation script for Om, Palak, and Nitin, including anticipated faculty viva questions and answers.
 
-### Error: `5 NOT_FOUND: Database not found`
-**Solution**: You must create the Firestore database instance once in the Firebase Console:
-👉 [Create Cloud Firestore Database](https://console.firebase.google.com/project/pixsort-62b7b/firestore)
+---
 
-### Error: `7 PERMISSION_DENIED: Missing or insufficient permissions`
-**Solution**: Publish the Firestore security rules provided in [Step 5](#7-step-5-cloud-firestore-database-setup--security-rules).
+## 14. Troubleshooting & FAQs
 
-### Error: `redirect_uri_mismatch`
-**Solution**: Use the **Sign in with Google (Popup)** button in PixSort. Popup authentication uses Firebase's pre-authorized domain (`pixsort-62b7b.firebaseapp.com`) and eliminates redirect URI mismatch issues on `localhost`.
+### Error: `Google Drive API has not been used in project... (403)`
+👉 Visit the [Google Cloud Console Drive API Overview](https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=68321745770) and click **ENABLE**.
+
+### Error: `Firestore (12.x): Could not reach Cloud Firestore backend (NOT_FOUND)`
+👉 Click **Create database** in the [Firebase Console Firestore tab](https://console.firebase.google.com/project/pixsort-62b7b/firestore). Until created, PixSort automatically operates in fast in-memory cache mode.
+
+### Error: `Storage full: Your connected Google Drive accounts do not have enough available storage`
+👉 Connect an additional personal Google Drive account in **Storage Settings**. PixSort will automatically pool the extra 15 GB and resume uploads.
