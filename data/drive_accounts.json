@@ -1,16 +1,16 @@
 [
   {
-    "id": "drive_acc_om",
-    "userId": "user_default",
+    "id": "drive_acc_1790221923136_aewt",
+    "userId": "RqDcc5ONIFQ3QCVtyDfJZJq8v9R2",
     "googleAccountEmail": "omprakashverma.in@gmail.com",
-    "googleAccountId": "google_om_primary",
+    "googleAccountId": "google_1790221923136",
     "storageLimit": 16106127360,
-    "storageUsed": 858993459,
-    "storageAvailable": 15247133901,
+    "storageUsed": 1288490188.8,
+    "storageAvailable": 14817637171.2,
     "priority": 1,
     "status": "active",
     "photoCount": 0,
-    "createdAt": "2026-09-23T14:53:39.194Z",
-    "updatedAt": "2026-09-23T14:56:21.154Z"
+    "createdAt": "2026-09-24T03:52:03.136Z",
+    "updatedAt": "2026-09-24T03:52:03.136Z"
   }
 ]
