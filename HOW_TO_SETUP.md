@@ -25,7 +25,7 @@ This guide walks through every step required to configure, run locally, connect 
 ## 1. Architecture Overview
 
 PixSort is a modern personal photo management and multimodal semantic search system built on Google Cloud services:
-- **Vision Intelligence**: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+- **Vision Intelligence**: Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`)
 - **Semantic Vector Space**: Gemini Embedding 2 (`gemini-embedding-2-preview`) producing **3072-dimensional** dense vectors
 - **Zero-API Search**: Sub-3ms in-memory cosine ranking ($0 search API cost)
 - **Decentralized Storage**: Google Drive REST API v3 streaming (`files.get?alt=media`) pooled across personal Google accounts

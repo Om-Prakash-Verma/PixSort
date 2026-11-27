@@ -171,7 +171,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Gemini 2.5 Flash Vision</span>
+              <span>Gemini 3.5 Flash Lite Vision</span>
             </div>
           </div>
         </div>
@@ -253,7 +253,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-sans">
-              <strong>Gemini 2.5 Flash Vision Analysis:</strong> &ldquo;{activeDemoResult.description}&rdquo;
+              <strong>Gemini 3.5 Flash Lite Vision Analysis:</strong> &ldquo;{activeDemoResult.description}&rdquo;
             </p>
 
             <div className="flex flex-wrap gap-1.5 pt-1">
@@ -309,7 +309,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Eye className="w-5 h-5 text-purple-600" />
               </div>
               <h3 className="text-base font-bold text-slate-900">
-                Gemini 2.5 Flash Vision
+                Gemini 3.5 Flash Lite Vision
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Multimodal vision examines every uploaded image like human eyes: recognizing faces, objects, activities, and emotional lighting.

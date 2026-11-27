@@ -13,7 +13,7 @@ $^2$*Assistant Professor, Department of Computer Science and Engineering, ABES E
 With the ubiquity of modern high-resolution smartphones, personal digital photography has reached unprecedented scales, exceeding 1.8 trillion captures globally per year. Despite this massive volume of visual data, personal photo management remains constrained by legacy relational paradigms that rely on rigid metadata, explicit filenames (e.g., `IMG_20260924_0912.jpg`), or exhaustive manual tagging. Empirical research demonstrates that over 98% of users abandon manual labeling within fourteen days, leading to "digital hoarding" where historical memories become inaccessible. Furthermore, commercial centralized cloud storage solutions introduce mounting subscription fees, vendor lock-in, and significant data privacy risks.
 
 This paper presents **PixSort**, an end-to-end decentralized personal photo intelligence system designed to resolve the semantic disconnect between conversational human queries and unindexed visual memories without recurring query costs. PixSort introduces a three-tier architecture:
-1. **Multimodal Scene Perception**: Utilizes Google's Gemini 2.5 Flash foundation model to execute zero-shot visual reasoning at ingestion, automatically synthesizing structured narratives detailing dominant subjects, physical activities, optical document text (OCR), and subtle aesthetic lighting/mood.
+1. **Multimodal Scene Perception**: Utilizes Google's Gemini 3.5 Flash Lite foundation model to execute zero-shot visual reasoning at ingestion, automatically synthesizing structured narratives detailing dominant subjects, physical activities, optical document text (OCR), and subtle aesthetic lighting/mood.
 2. **3072-Dimensional Vector Projection**: Maps synthesized visual narratives and unstructured natural language queries into a unified 3072-dimensional continuous latent space using `gemini-embedding-2-preview`. Query retrieval is formulated as an in-memory normalized dot-product cosine similarity calculation, achieving a sub-3ms query latency at **$0 external API cost** per search.
 3. **Decentralized Multi-Account Storage Pooling**: Implements an automated quota failover storage layer that aggregates heterogeneous personal Google Drive accounts via the Google Drive REST API v3 (`drive.file` scope). Raw binary images stream directly on demand (`files.get?alt=media`) across an aggregate $N \times 15\text{ GB}$ personal storage pool, eliminating centralized cloud hosting expenses.
 
@@ -40,7 +40,7 @@ To address the semantic gap, commercial providers (e.g., Google Photos, Apple iC
 
 ### C. Contributions of This Work
 To simultaneously overcome the semantic gap, the economic paywall, and the privacy vulnerabilities of centralized architectures, we introduce **PixSort**. The primary contributions of this paper are:
-1. **Multimodal Scene Perception Pipeline**: We demonstrate the application of Gemini 2.5 Flash Vision for autonomous, structured scene decomposition at ingestion, completely eliminating human manual tagging.
+1. **Multimodal Scene Perception Pipeline**: We demonstrate the application of Gemini 3.5 Flash Lite Vision for autonomous, structured scene decomposition at ingestion, completely eliminating human manual tagging.
 2. **Zero-API In-Memory Latent Space Search**: We formulate conversational photo retrieval over pre-normalized 3072-dimensional vector coordinates (`gemini-embedding-2-preview`), executing cosine similarity via vectorized RAM dot-products with sub-3ms latency and zero recurring cloud query fees.
 3. **Decentralized Multi-Drive Storage Pooling**: We design and validate a multi-account cloud storage pooling algorithm that aggregates multiple free 15 GB personal Google Drive accounts via REST API v3 direct streaming (`files.get?alt=media`), achieving seamless priority quota failover and complete data sovereignty.
 4. **Multi-Tenant Security Architecture**: We implement strict multi-tenant boundary isolation utilizing least-privilege OAuth scopes (`https://www.googleapis.com/auth/drive.file`), client-side `x-user-id` token headers, and per-user Cloud Firestore security rules.
@@ -60,7 +60,7 @@ The deep learning revolution introduced Convolutional Neural Networks (CNNs) suc
 ### C. Vision-Language Foundation Models & Dense Embeddings
 The emergence of dual-encoder architectures (such as OpenAI's CLIP and Google's ALIGN) demonstrated that contrastive pre-training on hundreds of millions of image-text pairs could align visual and textual representations into a shared metric embedding space. 
 
-Recent advancements in generative Multimodal Large Language Models (MLLMs), notably the Google Gemini model family, have extended this capability by unifying autoregressive visual reasoning with high-dimensional vector representations. In PixSort, we leverage **Gemini 2.5 Flash** for deep visual reasoning combined with **Gemini Embedding 2**, scaling the representational capacity to 3072 dimensions to capture fine-grained scene semantics.
+Recent advancements in generative Multimodal Large Language Models (MLLMs), notably the Google Gemini model family, have extended this capability by unifying autoregressive visual reasoning with high-dimensional vector representations. In PixSort, we leverage **Gemini 3.5 Flash Lite** for deep visual reasoning combined with **Gemini Embedding 2**, scaling the representational capacity to 3072 dimensions to capture fine-grained scene semantics.
 
 ---
 
@@ -123,7 +123,7 @@ The PixSort architectural topology is structured into four interconnected module
                       v                      v                     v
 +-------------------------+ +-------------------------+ +-------------------------+
 |    Google Drive API     | |     Cloud Firestore     | |        Google AI        |
-|  (Multi-Account Pool)   | |     (pixsort-62b7b)     | |  (Gemini 2.5 + Embed 2) |
+|  (Multi-Account Pool)   | |     (pixsort-62b7b)     | | (Gemini 3.5 + Embed 2)|
 | - REST v3 Stream        | | - Normalized Documents  | | - Multimodal Vision     |
 |   (files.get?alt=media) | | - Per-User Security     | | - 3072-D Dense Vector   |
 | - Dynamic Failover      | |   Rules (request.auth)  | |   Representations       |
@@ -134,7 +134,7 @@ The PixSort architectural topology is structured into four interconnected module
 
 ### A. Module 1: Ingestion & Vision Perception
 When an image binary is received:
-1. The Express ingestion controller dispatches the raw image buffer to Gemini 2.5 Flash via `@google/genai`.
+1. The Express ingestion controller dispatches the raw image buffer to Gemini 3.5 Flash Lite via `@google/genai`.
 2. The vision engine executes zero-shot multimodal inference against a structured JSON schema prompt, extracting:
    - `sceneDescription`: A concise 2-to-3 sentence narrative describing the human context.
    - `dominantSubjects`: Categorized primary and secondary entities (e.g., `["college student", "whiteboard", "laptop"]`).
@@ -228,7 +228,7 @@ We compared PixSort against three baseline retrieval paradigms:
 - **Baseline 1 (Filename / EXIF Match)**: Standard SQL `LIKE '%query%'` substring matching over filenames and dates.
 - **Baseline 2 (OCR-Only Lexical Match)**: Elastic-style BM25 full-text matching over extracted image text.
 - **Baseline 3 (Legacy 768-D Embeddings)**: Earlier dual-encoder 768-dimensional multimodal vectors.
-- **PixSort (Proposed)**: Gemini 2.5 Flash Vision + 3072-Dimensional Dense Embeddings + Cosine RAM Ranker.
+- **PixSort (Proposed)**: Gemini 3.5 Flash Lite Vision + 3072-Dimensional Dense Embeddings + Cosine RAM Ranker.
 
 #### Table I: Comparative Retrieval Performance Across 100 Test Queries
 
@@ -272,7 +272,7 @@ To illustrate the qualitative leap in semantic understanding, Table III document
 
 #### Table III: Qualitative Retrieval Case Studies
 
-| User Query | Stored Image Filename | Gemini 2.5 Flash Scene Story | Cosine Score $\cos\theta$ | Result |
+| User Query | Stored Image Filename | Gemini 3.5 Flash Lite Scene Story | Cosine Score $\cos\theta$ | Result |
 | :--- | :--- | :--- | :---: | :---: |
 | *"happy dinner with friends"* | `IMG_20240918_2041.jpg` | *"A warm evening gathering of friends around a dining table illuminated by candles, smiling over pasta bowls and wine glasses."* | **0.941** | **Rank #1** |
 | *"college id card"* | `scan_doc_09.png` | *"Close-up photograph of an official university student identity credential displaying student portrait, roll number, and CSE department seal."* | **0.973** | **Rank #1** |
@@ -292,7 +292,7 @@ To illustrate the qualitative leap in semantic understanding, Table III document
 ## VIII. Limitations and Future Work
 
 While PixSort demonstrates superior retrieval performance and zero search query costs, we acknowledge several architectural trade-offs:
-1. **Initial Upload Ingestion Latency**: Generating Gemini 2.5 Flash multimodal vision analysis and 3072-D dense embeddings introduces an ingestion latency of approximately 1.5 to 2.8 seconds per photo. Future work will investigate batch asynchronous worker queues with progressive thumbnail indexing.
+1. **Initial Upload Ingestion Latency**: Generating Gemini 3.5 Flash Lite multimodal vision analysis and 3072-D dense embeddings introduces an ingestion latency of approximately 1.5 to 2.8 seconds per photo. Future work will investigate batch asynchronous worker queues with progressive thumbnail indexing.
 2. **On-Device Edge Inference**: In future phases, we aim to deploy lightweight quantized vision-language models (such as MediaPipe or Gemma-2B) directly in the browser via WebAssembly (WASM) and WebGPU, allowing offline semantic search without internet connectivity.
 3. **Temporal Video Moment Seeking**: Expanding the 3072-D embedding space to index video streams by decomposing video keyframes into temporal trajectory vectors to enable queries such as *"the moment the birthday candles were blown out"*.
 
@@ -300,7 +300,7 @@ While PixSort demonstrates superior retrieval performance and zero search query 
 
 ## IX. Conclusion
 
-In this paper, we presented **PixSort**, an innovative, decentralized personal photo management system designed to overcome the semantic gap, cloud subscription paywalls, and privacy risks inherent in existing photo management software. By combining Google's Gemini 2.5 Flash foundation model with 3072-dimensional dense vector embeddings (`gemini-embedding-2-preview`), PixSort achieves an outstanding retrieval accuracy of **0.942 MRR@10** and **0.954 nDCG@10** on natural conversational queries. 
+In this paper, we presented **PixSort**, an innovative, decentralized personal photo management system designed to overcome the semantic gap, cloud subscription paywalls, and privacy risks inherent in existing photo management software. By combining Google's Gemini 3.5 Flash Lite foundation model with 3072-dimensional dense vector embeddings (`gemini-embedding-2-preview`), PixSort achieves an outstanding retrieval accuracy of **0.942 MRR@10** and **0.954 nDCG@10** on natural conversational queries. 
 
 Furthermore, by engineering a local in-memory cosine ranking engine, PixSort delivers sub-3ms query latencies at **$0 recurring search API costs**. Integrated with a multi-account Google Drive storage pooling engine that aggregates personal 15 GB quotas with automatic capacity failover and direct REST v3 streaming, PixSort provides a scalable, cost-free, and sovereign alternative for personal digital memory preservation.
 
@@ -311,7 +311,7 @@ Furthermore, by engineering a local in-memory cosine ranking engine, PixSort del
 1. A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, "Attention Is All You Need," in *Advances in Neural Information Processing Systems (NeurIPS)*, vol. 30, 2017.
 2. A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark, et al., "Learning Transferable Visual Models From Natural Language Supervision," in *International Conference on Machine Learning (ICML)*, pp. 8748–8763, PMLR, 2021.
 3. Gemini Team, Google, "Gemini: A Family of Highly Capable Multimodal Models," *arXiv preprint arXiv:2312.11805*, 2023.
-4. Google DeepMind, "Gemini 2.5: Multimodal Reasoning and Long-Context Understanding Technical Report," Google Research, 2024.
+4. Google DeepMind, "Gemini 3.5: Multimodal Reasoning and Long-Context Understanding Technical Report," Google Research, 2025.
 5. Y. Guo, Y. Liu, A. Oerlemans, S. Lao, S. Wu, and M. S. Lew, "Deep learning for visual understanding: A review," *Neurocomputing*, vol. 187, pp. 27–48, 2016.
 6. A. Babenko and V. Lempitsky, "Efficient Ann Search in Extremely Large Datasets: An Overview," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 42, no. 4, pp. 855–870, 2020.
 7. J. Johnson, M. Douze, and H. Jégou, "Billion-scale similarity search with GPUs," *IEEE Transactions on Big Data*, vol. 7, no. 3, pp. 535–547, 2019.

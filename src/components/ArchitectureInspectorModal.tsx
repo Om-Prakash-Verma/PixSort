@@ -140,7 +140,7 @@ export const ArchitectureInspectorModal: React.FC<ArchitectureInspectorModalProp
             </div>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
-            <strong>Dual-Engine Architecture:</strong> Gemini 2.5 Flash is invoked only once during photo upload to extract visual understanding. Search queries are processed completely offline by the local semantic engine, saving 100% of API quota and providing instantaneous search results!
+            <strong>Dual-Engine Architecture:</strong> Gemini 3.5 Flash Lite is invoked only once during photo upload to extract visual understanding. Search queries are processed completely offline by the local semantic engine, saving 100% of API quota and providing instantaneous search results!
           </p>
         </div>
 

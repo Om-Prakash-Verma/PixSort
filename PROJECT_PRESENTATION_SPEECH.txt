@@ -71,7 +71,7 @@ When a user uploads a photo, our system processes it in two main steps.
 
 ### Step 1 — Understanding the Image
 
-First, we use **Google Gemini 2.5 Flash** to understand the image.
+First, we use **Google Gemini 3.5 Flash Lite** to understand the image.
 
 Gemini looks at the image and identifies things such as:
 

@@ -136,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Ingestion Vision</span>
-            <span className="font-medium text-slate-700">Gemini 2.5 Flash</span>
+            <span className="font-medium text-slate-700">Gemini 3.5 Flash Lite</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Vector Index</span>

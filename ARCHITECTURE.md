@@ -30,7 +30,7 @@ This document details the engineering architecture of **PixSort**, explaining th
 +-----------------------+   +-----------------------+   +-----------------------+
 |    Google Drive API   |   |   Cloud Firestore     |   |      Google AI        |
 |  (Multi-Account Pool) |   |    (pixsort-62b7b)    |   |     (Gemini APIs)     |
-| - 15 GB + 15 GB Pool  |   | - Photo & Album Docs  |   | - Gemini 2.5 Flash    |
+| - 15 GB + 15 GB Pool  |   | - Photo & Album Docs  |   | - Gemini 3.5 Flash Lite    |
 | - Priority Failover   |   | - Relational Pointers |   |   (Vision Story)      |
 | - Direct REST Stream  |   | - Per-User Security   |   | - Gemini Embedding 2  |
 |   (files.get?alt=media|   |   Rules (request.auth)|   |   (3072-D Vectors)    |
@@ -42,10 +42,10 @@ This document details the engineering architecture of **PixSort**, explaining th
 
 ## 2. Core Google Services & Selection Rationale
 
-### 1. Gemini Multimodal AI (`gemini-2.5-flash`)
+### 1. Gemini Multimodal AI (`gemini-3.5-flash-lite`)
 - **Role**: Multimodal vision analysis at photo ingestion.
 - **Why It Was Chosen**:
-  - **Human-Level Perception**: Rather than detecting shallow bounding boxes or isolated object tags, Gemini 2.5 Flash reads the photo holistically. It extracts dominant subjects, context, physical actions, lighting/aesthetic mood, and optical text (receipts, ID cards, whiteboards).
+  - **Human-Level Perception**: Rather than detecting shallow bounding boxes or isolated object tags, Gemini 3.5 Flash Lite reads the photo holistically. It extracts dominant subjects, context, physical actions, lighting/aesthetic mood, and optical text (receipts, ID cards, whiteboards).
   - **Structured JSON Ingestion**: Generates machine-parseable metadata that populates Firestore and enriches dense semantic vector embeddings.
 
 ### 2. Gemini Embedding 2 (`gemini-embedding-2-preview`)
@@ -115,7 +115,7 @@ This document details the engineering architecture of **PixSort**, explaining th
 4. Uploads raw binary to Google Drive (AI Photo Search/Photos/YYYY/MM/)
        │
        ▼
-5. Multimodal Vision Analysis (Gemini 2.5 Flash extracts scene story, objects, mood)
+5. Multimodal Vision Analysis (Gemini 3.5 Flash Lite extracts scene story, objects, mood)
        │
        ▼
 6. 3072-D Vector Projection (Gemini Embedding 2 maps description to vector space)

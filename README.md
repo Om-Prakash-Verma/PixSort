@@ -2,7 +2,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
-[![Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4.svg)](https://deepmind.google/technologies/gemini/)
+[![Gemini](https://img.shields.io/badge/Google_Gemini-3.5_Flash_Lite-4285F4.svg)](https://deepmind.google/technologies/gemini/)
 [![Embeddings](https://img.shields.io/badge/Gemini_Embedding-2_(3072--D)-34A853.svg)](https://cloud.google.com/vertex-ai)
 [![Google Drive API](https://img.shields.io/badge/Google_Drive_API-v3_Streaming-FBBC05.svg)](https://developers.google.com/drive)
 [![Cloud Firestore](https://img.shields.io/badge/Cloud_Firestore-pixsort--62b7b-EA4335.svg)](https://firebase.google.com/)
@@ -33,7 +33,7 @@ Traditional galleries search by cryptic filenames (`IMG_8392.jpg`) or require te
 
 | Google Cloud Product | Architecture Tier | Rationale & Technical Implementation |
 | :--- | :--- | :--- |
-| **Google Gemini 2.5 Flash** (`gemini-2.5-flash`) | **Multimodal Vision Perception** | Analyzes raw pixels at ingestion like human eyes: extracts subjects, lighting conditions, emotional atmosphere, activities, and optical document text (OCR). |
+| **Google Gemini 3.5 Flash Lite** (`gemini-3.5-flash-lite`) | **Multimodal Vision Perception** | Analyzes raw pixels at ingestion like human eyes: extracts subjects, lighting conditions, emotional atmosphere, activities, and optical document text (OCR). |
 | **Gemini Embedding 2** (`gemini-embedding-2-preview`) | **3072-D Semantic Coordinate Space** | Projects textual and visual concepts into a shared normalized 3072-dimensional continuous geometry, making conversational English directly comparable with visual memories. |
 | **Zero-API Hybrid Vector Engine** | **Local In-Memory Ranker (~3ms)** | Pre-indexes normalized embeddings and computes Cosine Similarity ($\cos\theta = A \cdot B$) in RAM. Searches execute in ~3ms at **$0 cloud query cost** with zero rate limits. |
 | **Google Drive REST API v3** | **Decentralized Storage Pooling** | Pools multiple personal Google Accounts (15 GB + 15 GB = 30+ GB). Features automatic quota failover (`about.get`), priority reordering, safe disconnect, and **direct binary streaming** (`files.get?alt=media`). |

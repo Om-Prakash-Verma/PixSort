@@ -8,7 +8,7 @@ This document preserves persistent coding standards, scope boundaries, and desig
 - Prefer deletion and simplification over adding unnecessary code.
 
 ## 2. Google Ecosystem Utilization
-- **Vision & Embeddings**: Always use `@google/genai` TypeScript SDK (`gemini-2.5-flash` for multimodal vision analysis and `gemini-embedding-2-preview` for **3072-dimensional** dense vector embeddings).
+- **Vision & Embeddings**: Always use `@google/genai` TypeScript SDK (`gemini-3.5-flash-lite` for multimodal vision analysis and `gemini-embedding-2-preview` for **3072-dimensional** dense vector embeddings).
 - **Vector Search**: Use local in-memory cosine similarity matching ($\cos\theta = A \cdot B$) following Vertex AI Vector Search principles for sub-3ms, $0 query cost search.
 - **Decentralized Storage**: Use Google Drive REST API v3 streaming (`files.get?alt=media`) pooled across personal Google accounts with capacity failover, priority reordering, safe disconnect, and storage deletion controls.
 - **Persistence & Security**: Use Google Cloud Firestore (`pixsort-62b7b`) as the source of truth for photo and album records, protected by per-user security rules (`request.auth.uid == resource.data.userId`).

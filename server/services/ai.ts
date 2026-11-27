@@ -34,7 +34,7 @@ const CONCEPT_CLUSTERS: Record<string, string[]> = {
 };
 
 // Resilient chain of vision models
-const VISION_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+const VISION_MODELS = ['gemini-3.5-flash-lite'];
 
 export class GeminiAIService {
   private client: GoogleGenAI | null = null;

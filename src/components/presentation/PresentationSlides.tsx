@@ -325,7 +325,7 @@ export const Slide2Pipeline: React.FC = () => {
     {
       num: '02',
       title: 'AI "Sees" the Scene',
-      tech: 'Google Gemini 2.5 Flash Vision',
+      tech: 'Google Gemini 3.5 Flash Lite Vision',
       simple: 'Gemini examines the image like human eyes: detecting faces, objects, activities, lighting, and overall emotional atmosphere.',
       analogy: 'Like asking a friend: "What is happening in this picture?"',
       latency: '~480 ms',
@@ -544,8 +544,8 @@ export const Slide4Objectives: React.FC = () => {
             id: 'GOAL 2',
             title: 'Automated Scene Understanding',
             simple: 'The system reads the photo like a human: recognizing people, objects, lighting, mood, and activities automatically.',
-            techSpecs: 'Google Gemini 2.5 Flash Multimodal Vision · Zero-shot structured JSON parsing.',
-            badge: 'Gemini 2.5 Flash',
+            techSpecs: 'Google Gemini 3.5 Flash Lite Multimodal Vision · Zero-shot structured JSON parsing.',
+            badge: 'Gemini 3.5 Flash Lite',
           },
           {
             id: 'GOAL 3',
@@ -747,9 +747,9 @@ export const Slide6TechStack: React.FC = () => {
     {
       tier: 'TIER 3',
       title: 'Multimodal AI & 3072-D Vector Search (The Brain)',
-      tech: 'Gemini 2.5 Flash · Gemini Embedding 2 (3072-D) · Vertex AI',
+      tech: 'Gemini 3.5 Flash Lite · Gemini Embedding 2 (3072-D) · Vertex AI',
       role: 'Multimodal scene comprehension and zero-API vector search.',
-      details: 'Gemini 2.5 Flash extracts rich scene narratives and metadata at ingestion. Gemini Embedding 2 generates 3072-D dense embeddings for instant sub-3ms local cosine ranking ($0 search cost).',
+      details: 'Gemini 3.5 Flash Lite extracts rich scene narratives and metadata at ingestion. Gemini Embedding 2 generates 3072-D dense embeddings for instant sub-3ms local cosine ranking ($0 search cost).',
     },
     {
       tier: 'TIER 4',
@@ -815,7 +815,7 @@ export const Slide6TechStack: React.FC = () => {
       <div className={`p-3 rounded-xl border text-xs font-mono text-center ${
         isDark ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
       }`}>
-        Next.js / React 19 • TypeScript • Firebase Dual-Mode Auth • x-user-id Tenant Isolation • Cloud Firestore Rules • Google Drive API v3 (Direct Stream &amp; Deletion) • Gemini 2.5 Flash • 3072-D Gemini Embedding 2 • Vertex AI
+        Next.js / React 19 • TypeScript • Firebase Dual-Mode Auth • x-user-id Tenant Isolation • Cloud Firestore Rules • Google Drive API v3 (Direct Stream &amp; Deletion) • Gemini 3.5 Flash Lite • 3072-D Gemini Embedding 2 • Vertex AI
       </div>
     </div>
   );
@@ -880,7 +880,7 @@ export const Slide7Architecture: React.FC = () => {
               <div className="text-[9px] text-indigo-500">files.get?alt=media</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
-              <div className="font-bold text-slate-800">6. Gemini 2.5</div>
+              <div className="font-bold text-slate-800">6. Gemini 3.5</div>
               <div className="text-[9px] text-slate-500">Vision Analysis</div>
             </div>
             <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-blue-50/70 border-blue-200'}`}>
@@ -1009,7 +1009,7 @@ export const Slide8Features: React.FC = () => {
             icon: FolderHeart,
             title: 'Deep AI Scene Inspector & Smart Albums',
             whatItIs: 'Complete AI vision transparency with zero-duplication organization.',
-            example: 'Click any photo to inspect Gemini 2.5 Flash scene breakdown, dominant subjects, aesthetic mood, and Drive metadata. Group photos into albums with 2-phase recovery bin.',
+            example: 'Click any photo to inspect Gemini 3.5 Flash Lite scene breakdown, dominant subjects, aesthetic mood, and Drive metadata. Group photos into albums with 2-phase recovery bin.',
             benefit: 'Instant grouping and complete explainability without duplicating files.',
           },
         ].map((feat, idx) => {
@@ -1200,7 +1200,7 @@ export const Slide10Conclusion: React.FC = () => {
           <ul className={`space-y-2.5 text-xs sm:text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span><strong>Multimodal AI Replaces Manual Tagging:</strong> Gemini 2.5 Flash + Gemini Embedding 2 (3072-D) automatically extract and index rich scene semantics with zero user fatigue.</span>
+              <span><strong>Multimodal AI Replaces Manual Tagging:</strong> Gemini 3.5 Flash Lite + Gemini Embedding 2 (3072-D) automatically extract and index rich scene semantics with zero user fatigue.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
