@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Calendar, Sparkles, ArrowUpDown, Heart, MapPin, SearchX, Keyboard } from 'lucide-react';
+import { Calendar, Sparkles, ArrowUpDown, Heart, MapPin, SearchX } from 'lucide-react';
 import { Photo, SearchInterpretedFilter } from '../types.js';
 import { PhotoCard } from './PhotoCard.js';
 
@@ -329,27 +329,6 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
           </div>
         </div>
       )}
-
-      {/* Keyboard Shortcut Guidance Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 rounded-xl neo-inset-sm text-[11px] text-slate-500 font-mono">
-        <div className="flex items-center gap-1.5">
-          <Keyboard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-          <span className="font-semibold text-slate-700">Arrow Key Navigation:</span>
-          <span>Use</span>
-          <div className="inline-flex gap-0.5">
-            <kbd className="px-1 py-0.5 rounded bg-white text-slate-700 font-bold border border-slate-300 shadow-2xs text-[10px]">↑</kbd>
-            <kbd className="px-1 py-0.5 rounded bg-white text-slate-700 font-bold border border-slate-300 shadow-2xs text-[10px]">↓</kbd>
-            <kbd className="px-1 py-0.5 rounded bg-white text-slate-700 font-bold border border-slate-300 shadow-2xs text-[10px]">←</kbd>
-            <kbd className="px-1 py-0.5 rounded bg-white text-slate-700 font-bold border border-slate-300 shadow-2xs text-[10px]">→</kbd>
-          </div>
-          <span className="hidden sm:inline">to navigate</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span>Press</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-white text-slate-700 font-bold border border-slate-300 shadow-2xs text-[10px]">Enter</kbd>
-          <span>or Space to view</span>
-        </div>
-      </div>
 
       {/* Main Grid: Date Grouped Layout (when not search) */}
       {!isSearchResult && groupedByDate ? (

@@ -656,13 +656,22 @@ export class GoogleDriveStorageProvider {
     }
 
     // 2. Fetch from Google Drive API using only this account's own credentials
-    const activeToken = this.credentials.get(accountId)?.accessToken;
+    let activeToken = this.credentials.get(accountId)?.accessToken;
 
     if (activeToken && !fileId.startsWith('drive_file_')) {
       try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
           headers: { Authorization: `Bearer ${activeToken}` },
         });
+        if (res.status === 401) {
+          const refreshed = await this.refreshAccessToken(accountId);
+          if (refreshed) {
+            activeToken = refreshed;
+            res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+              headers: { Authorization: `Bearer ${activeToken}` },
+            });
+          }
+        }
         if (res.ok) {
           const arrayBuffer = await res.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);

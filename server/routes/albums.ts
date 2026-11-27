@@ -9,7 +9,7 @@ albumsRouter.use(requireAuth);
 // List albums
 albumsRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const albums = await dbService.getAlbums(req.userId!);
+    const albums = await dbService.getAlbums(req.userId!, req.idToken);
     res.json(albums);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -23,7 +23,7 @@ albumsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Album name is required' });
     }
-    const newAlbum = await dbService.createAlbum(req.userId!, name.trim());
+    const newAlbum = await dbService.createAlbum(req.userId!, name.trim(), req.idToken);
     res.status(201).json(newAlbum);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -37,7 +37,7 @@ albumsRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response) => 
     if (!album || album.userId !== req.userId) {
       return res.status(404).json({ error: 'Album not found' });
     }
-    const success = await dbService.deleteAlbum(req.params.id);
+    const success = await dbService.deleteAlbum(req.params.id, req.idToken);
     res.json({ success });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

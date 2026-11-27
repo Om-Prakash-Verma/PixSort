@@ -41,9 +41,12 @@ export async function getAuthHeaders(currentUser?: BasicUser | null): Promise<Re
 
   try {
     const auth = await getFirebaseAuthInstance();
-    if (auth?.currentUser) {
-      const token = await auth.currentUser.getIdToken();
-      return { Authorization: `Bearer ${token}` };
+    if (auth) {
+      await auth.authStateReady();
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdToken();
+        return { Authorization: `Bearer ${token}` };
+      }
     }
   } catch {
     // ignore

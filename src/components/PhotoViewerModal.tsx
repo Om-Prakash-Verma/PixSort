@@ -271,10 +271,10 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
           )}
 
           {/* Tactile Action Bar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 rounded-full neo-raised max-w-full overflow-x-auto">
+          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 rounded-full neo-raised max-w-full overflow-x-auto">
             <button
               onClick={() => onFindSimilar(photo)}
-              className="px-4 py-2 rounded-full neo-btn-primary text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              className="px-4 py-2 rounded-full neo-btn-primary text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer"
               title="Find Similar Photos via Vector Search"
             >
               <Layers className="w-3.5 h-3.5" />
@@ -283,10 +283,10 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
 
             <button
               onClick={(e) => onToggleFavorite(photo, e)}
-              className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0 ${
+              className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer ${
                 photo.isFavorite
-                  ? 'neo-btn neo-btn-active text-rose-600'
-                  : 'neo-btn text-slate-700'
+                  ? 'bg-rose-50 text-rose-600'
+                  : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
               title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
@@ -298,8 +298,10 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
             <div className="relative shrink-0">
               <button
                 onClick={() => setShowAlbumMenu((v) => !v)}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-                  showAlbumMenu ? 'neo-btn neo-btn-active text-blue-600' : 'neo-btn text-slate-700'
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  showAlbumMenu
+                    ? 'bg-white/80 text-blue-600'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
                 }`}
                 title="Add to Album"
               >
@@ -349,7 +351,7 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
 
             <button
               onClick={handleDownload}
-              className="px-3.5 py-2 rounded-full neo-btn text-slate-700 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              className="px-3.5 py-2 rounded-full text-slate-600 hover:bg-white/60 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
               title="Download original"
             >
               <Download className="w-3.5 h-3.5" />
@@ -360,7 +362,7 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
 
             <button
               onClick={() => onDeletePhoto(photo)}
-              className="px-3.5 py-2 rounded-full neo-btn text-slate-500 hover:text-rose-600 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              className="px-3.5 py-2 rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
               title="Move to Trash"
             >
               <Trash2 className="w-3.5 h-3.5" />

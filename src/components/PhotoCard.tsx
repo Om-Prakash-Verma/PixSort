@@ -25,10 +25,16 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   const [hasError, setHasError] = useState(false);
   const isReady = photo.processingStatus === 'READY';
   const cardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    setImageLoaded(false);
-    setHasError(false);
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+      setImageLoaded(true);
+      setHasError(false);
+    } else {
+      setImageLoaded(false);
+      setHasError(false);
+    }
   }, [photo.thumbnailUrl, photo.url]);
 
   // Auto-scroll into view when focused via keyboard navigation
@@ -84,6 +90,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           </div>
         ) : (
           <img
+            ref={imgRef}
             src={photo.thumbnailUrl || photo.url}
             alt={photo.aiDescription}
             loading="lazy"
@@ -100,28 +107,23 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         )}
 
         {/* Top Badges Overlay */}
-        <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none">
-          {/* Filename Tag (Proves camera file name has no keywords) */}
-          <span className="px-2 py-0.5 rounded-lg bg-slate-900/60 backdrop-blur-md text-[10px] font-mono text-white/90 tracking-tight">
-            {photo.filename}
-          </span>
+        {(photo.similarityScore !== undefined || !isReady) && (
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 pointer-events-none">
+            {photo.similarityScore !== undefined && (
+              <span className="px-2 py-0.5 rounded-lg bg-blue-600/90 backdrop-blur-md text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                {Math.round(photo.similarityScore * 100)}% match
+              </span>
+            )}
 
-          {/* Similarity score badge if present */}
-          {photo.similarityScore !== undefined && (
-            <span className="px-2 py-0.5 rounded-lg bg-blue-600/90 backdrop-blur-md text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
-              <Sparkles className="w-2.5 h-2.5" />
-              {Math.round(photo.similarityScore * 100)}% match
-            </span>
-          )}
-
-          {/* Processing badge */}
-          {!isReady && (
-            <span className="px-2 py-0.5 rounded-lg bg-amber-500/90 backdrop-blur-md text-[10px] font-semibold text-white flex items-center gap-1">
-              <Loader2 className="w-2.5 h-2.5 animate-spin" />
-              {photo.processingStatus}
-            </span>
-          )}
-        </div>
+            {!isReady && (
+              <span className="px-2 py-0.5 rounded-lg bg-amber-500/90 backdrop-blur-md text-[10px] font-semibold text-white flex items-center gap-1">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                {photo.processingStatus}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Hover Action Buttons */}
         <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">

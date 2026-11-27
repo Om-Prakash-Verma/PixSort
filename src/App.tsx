@@ -184,6 +184,7 @@ export default function App() {
           data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         }
         setPhotos(data);
+        setSelectedPhoto((prev) => (prev ? data.find((p) => p.id === prev.id) || prev : null));
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
@@ -231,6 +232,23 @@ export default function App() {
       loadSystemStatus();
     }
   }, [currentUser, loadPhotos, loadAlbums, loadSystemStatus]);
+
+  // Poll while any photo is still being analyzed/indexed by Gemini in the background
+  useEffect(() => {
+    const hasPending = photos.some(
+      (p) =>
+        p.processingStatus === 'PROCESSING' ||
+        p.processingStatus === 'INDEXING' ||
+        p.processingStatus === 'UPLOADING'
+    );
+    if (!hasPending || !currentUser) return;
+
+    const timer = setInterval(() => {
+      loadPhotos();
+      loadSystemStatus();
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [photos, currentUser, loadPhotos, loadSystemStatus]);
 
   // Sync presentation mode with browser URL and history
   useEffect(() => {

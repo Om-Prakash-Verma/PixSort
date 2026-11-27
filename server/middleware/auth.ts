@@ -6,6 +6,7 @@ import { Request, Response, NextFunction } from 'express';
 export interface AuthenticatedRequest extends Request {
   userId?: string;
   isGuest?: boolean;
+  idToken?: string;
 }
 
 const GOOGLE_CERTS_URL =
@@ -140,6 +141,7 @@ export async function requireAuth(
       const payload = await verifyFirebaseIdToken(token);
       req.userId = payload.sub;
       req.isGuest = false;
+      req.idToken = token;
       next();
       return;
     } catch (err: any) {

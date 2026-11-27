@@ -18,11 +18,15 @@ photosRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
     const isTrash = req.query.trash === 'true';
     const userId = req.userId!;
 
-    const photos = await dbService.getPhotos(userId, {
-      albumId,
-      isFavorite,
-      isTrash,
-    });
+    const photos = await dbService.getPhotos(
+      userId,
+      {
+        albumId,
+        isFavorite,
+        isTrash,
+      },
+      req.idToken
+    );
 
     // Check disconnected accounts scoped to user
     const accounts = await driveStorageService.getAccounts(userId);
@@ -103,7 +107,8 @@ photosRouter.post('/upload', async (req: AuthenticatedRequest, res: Response) =>
       mimeType: mimeType || 'image/jpeg',
     };
 
-    await dbService.createPhoto(initialPhoto);
+    const idToken = req.idToken;
+    await dbService.createPhoto(initialPhoto, idToken);
 
     // Return immediately so UI stays responsive and tracks processing state
     res.status(202).json({
@@ -122,7 +127,7 @@ photosRouter.post('/upload', async (req: AuthenticatedRequest, res: Response) =>
           location
         );
 
-        await dbService.updatePhoto(photoId, { processingStatus: 'INDEXING' });
+        await dbService.updatePhoto(photoId, { processingStatus: 'INDEXING' }, idToken);
         const embeddingText = `${vision.aiDescription} ${vision.objects.join(' ')} ${vision.activities.join(' ')} ${vision.environment} ${vision.time} ${location || ''}`;
         const vector = await aiService.embedText(embeddingText);
 
@@ -139,20 +144,24 @@ photosRouter.post('/upload', async (req: AuthenticatedRequest, res: Response) =>
           },
         });
 
-        await dbService.updatePhoto(photoId, {
-          aiDescription: vision.aiDescription,
-          objects: vision.objects,
-          activities: vision.activities,
-          environment: vision.environment,
-          time: vision.time,
-          processingStatus: 'READY',
-          embeddingDimension: vector.length,
-        });
+        await dbService.updatePhoto(
+          photoId,
+          {
+            aiDescription: vision.aiDescription,
+            objects: vision.objects,
+            activities: vision.activities,
+            environment: vision.environment,
+            time: vision.time,
+            processingStatus: 'READY',
+            embeddingDimension: vector.length,
+          },
+          idToken
+        );
 
         console.log(`[Upload Pipeline] Photo ${photoId} indexed and READY with summary: "${vision.aiDescription.slice(0, 50)}..."`);
       } catch (bgError) {
         console.error(`[Upload Pipeline Error] ${photoId}:`, bgError);
-        await dbService.updatePhoto(photoId, { processingStatus: 'ERROR' });
+        await dbService.updatePhoto(photoId, { processingStatus: 'ERROR' }, idToken);
       }
     })();
   } catch (err: any) {
@@ -170,7 +179,7 @@ photosRouter.patch('/:id/favorite', async (req: AuthenticatedRequest, res: Respo
     }
 
     const newFavorite = !photo.isFavorite;
-    const updated = await dbService.updatePhoto(req.params.id, { isFavorite: newFavorite });
+    const updated = await dbService.updatePhoto(req.params.id, { isFavorite: newFavorite }, req.idToken);
 
     const vec = vectorSearchService.getVector(req.params.id);
     if (vec) {
@@ -194,7 +203,7 @@ photosRouter.patch('/:id/album', async (req: AuthenticatedRequest, res: Response
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const updated = await dbService.togglePhotoAlbum(req.params.id, albumId);
+    const updated = await dbService.togglePhotoAlbum(req.params.id, albumId, req.idToken);
     if (!updated) return res.status(404).json({ error: 'Photo not found' });
 
     const vec = vectorSearchService.getVector(req.params.id);
@@ -249,7 +258,7 @@ photosRouter.patch('/:id/restore', async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const success = await dbService.restorePhoto(req.params.id);
+    const success = await dbService.restorePhoto(req.params.id, req.idToken);
     const vec = vectorSearchService.getVector(req.params.id);
     if (vec) vec.metadata.isTrash = false;
     res.json({ success });
@@ -267,7 +276,7 @@ photosRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response) => 
     }
 
     const permanent = req.query.permanent === 'true';
-    const success = await dbService.deletePhoto(req.params.id, permanent);
+    const success = await dbService.deletePhoto(req.params.id, permanent, req.idToken);
 
     if (permanent) {
       await storageService.deletePhoto(

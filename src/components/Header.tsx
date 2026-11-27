@@ -159,18 +159,12 @@ export const Header: React.FC<HeaderProps> = ({
             <Menu className="w-4 h-4" />
           </button>
         )}
-        <div className="w-10 h-10 rounded-2xl neo-raised flex items-center justify-center text-blue-600">
-          <Sparkles className="w-5 h-5 text-blue-600" />
+        <div className="w-9 h-9 rounded-2xl neo-raised flex items-center justify-center text-blue-600">
+          <Sparkles className="w-4 h-4 text-blue-600" />
         </div>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-lg text-slate-800 tracking-tight font-sans">PixSort</span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
-              Auto-Processing
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 hidden sm:block">Image Upload & Auto-Processing • Gemini AI</p>
-        </div>
+        <span className="font-bold text-lg text-slate-800 tracking-tight font-sans hidden sm:inline">
+          PixSort
+        </span>
       </div>
 
       {/* Large Neomorphic Search Bar */}

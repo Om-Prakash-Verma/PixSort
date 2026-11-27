@@ -11,8 +11,9 @@ export const systemRouter = Router();
 systemRouter.use(requireAuth);
 
 // System status (scoped to authenticated user)
-systemRouter.get('/status', (req: AuthenticatedRequest, res: Response) => {
+systemRouter.get('/status', async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.userId!;
+  await dbService.ensureUserHydrated(userId, req.idToken);
   const stats = dbService.getStats(userId);
   const pooled = driveStorageService.getPooledStats(userId);
 

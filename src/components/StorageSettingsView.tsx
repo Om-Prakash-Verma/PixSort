@@ -67,6 +67,8 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 GB';
+    const tb = bytes / (1024 * 1024 * 1024 * 1024);
+    if (tb >= 1) return `${tb.toFixed(1)} TB`;
     const gb = bytes / (1024 * 1024 * 1024);
     if (gb >= 1) return `${gb.toFixed(1)} GB`;
     const mb = bytes / (1024 * 1024);
@@ -288,88 +290,94 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const totalPoolUsed = accounts.filter((a) => a.status === 'active').reduce((acc, a) => acc + a.storageUsed, 0);
   const totalPoolPct = getUsagePercentage(totalPoolUsed, totalPoolLimit);
 
+  const activeAccountsCount = accounts.filter((a) => a.status === 'active').length;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-200">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider">
-            <HardDrive className="w-4 h-4" />
-            <span>Connected Storage</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
             Google Drive Storage
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Your photos are stored in your own Google Drive accounts.
+            Pooled personal Drive accounts with automatic capacity failover
           </p>
         </div>
 
         <button
           onClick={() => setShowConnectModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl neo-btn text-xs font-bold text-blue-700 hover:text-blue-900 transition-all cursor-pointer shadow-sm self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full neo-btn-primary text-xs font-semibold cursor-pointer self-start sm:self-auto"
         >
-          <Plus className="w-4 h-4 text-blue-600" />
-          <span>+ Connect Google Drive</span>
+          <Plus className="w-4 h-4" />
+          <span>Connect Drive</span>
         </button>
       </div>
 
-      {/* Failover & Automatic Allocation Banner (Section 5 & 17) */}
-      <div className="p-4 rounded-2xl neo-inset border border-white/60 space-y-2">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-xl neo-raised flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
-            <Sparkles className="w-4 h-4" />
+      {/* 3-Tile Storage Pool Summary Bento */}
+      <div className="p-5 rounded-3xl neo-raised space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-3.5 rounded-2xl neo-inset-sm">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Total Pool
+            </div>
+            <div className="text-base font-bold text-slate-800 mt-0.5 tabular-nums">
+              {formatBytes(totalPoolLimit)}
+            </div>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-xs font-bold text-slate-800">
-              Automatic Storage Failover & Allocation
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Storage automatically switches to your next connected Drive when the current Drive runs out of space.
-              All connected accounts are pooled together into one seamless, unified photo library.
-            </p>
+
+          <div className="p-3.5 rounded-2xl neo-inset-sm">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Used
+            </div>
+            <div className="text-base font-bold text-slate-800 mt-0.5 tabular-nums">
+              {formatBytes(totalPoolUsed)}{' '}
+              <span className="text-xs font-semibold text-blue-600">({totalPoolPct}%)</span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl neo-inset-sm">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Active Drives
+            </div>
+            <div className="text-base font-bold text-slate-800 mt-0.5 tabular-nums">
+              {activeAccountsCount}
+            </div>
           </div>
         </div>
 
-        {/* Aggregate Storage Progress Bar */}
-        <div className="pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Total Pooled Storage:</span>
-            <span className="font-mono text-slate-900 font-bold">
-              {formatBytes(totalPoolUsed)} / {formatBytes(totalPoolLimit)} used
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">
-              {totalPoolPct}%
-            </span>
-          </div>
-          <div className="text-[11px] text-slate-500">
-            {accounts.filter((a) => a.status === 'active').length} Active Drive Accounts Pooled
-          </div>
+        <div className="w-full h-2 rounded-full neo-inset-sm overflow-hidden p-0.5">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-all duration-500"
+            style={{ width: `${Math.max(totalPoolPct, totalPoolLimit > 0 ? 2 : 0)}%` }}
+          />
         </div>
       </div>
 
       {/* Connected Accounts Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Connected Accounts ({accounts.length})
+          <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Accounts ({accounts.length})
           </h2>
-          <span className="text-[11px] text-slate-400">
-            Order determines priority for new photo uploads
-          </span>
+          {accounts.length > 1 && (
+            <span className="text-[11px] text-slate-400">
+              Top account receives new uploads first
+            </span>
+          )}
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-400 text-xs">Loading connected Drive accounts...</div>
+          <div className="p-10 text-center text-slate-400 text-xs">Loading connected Drive accounts...</div>
         ) : accounts.length === 0 ? (
-          <div className="p-8 rounded-2xl neo-raised text-center space-y-3">
+          <div className="p-10 rounded-3xl neo-raised text-center space-y-3">
             <HardDrive className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="text-xs font-semibold text-slate-600">No Google Drive accounts connected yet</p>
             <button
               onClick={() => setShowConnectModal(true)}
-              className="px-4 py-2 rounded-xl neo-btn text-xs font-bold text-blue-700"
+              className="px-4 py-2 rounded-full neo-btn-primary text-xs font-semibold cursor-pointer"
             >
-              + Connect Google Drive
+              Connect Google Drive
             </button>
           </div>
         ) : (
@@ -382,76 +390,86 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
               return (
                 <div
                   key={acc.id}
-                  className={`p-5 rounded-2xl border transition-all ${
+                  className={`p-5 rounded-3xl transition-all ${
                     isActive
-                      ? 'neo-raised bg-[#EEF2F6] border-white/80'
-                      : 'opacity-70 bg-slate-100 border-slate-200'
+                      ? 'neo-raised bg-[#EEF2F6]'
+                      : 'opacity-70 neo-inset'
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     {/* Account Identity & Status */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-center gap-1">
-                        <button
-                          disabled={index === 0}
-                          onClick={() => handleMovePriority(index, 'up')}
-                          className={`p-1 rounded-lg neo-btn transition-colors ${
-                            index === 0
-                              ? 'opacity-30 cursor-not-allowed text-slate-300'
-                              : 'text-slate-600 hover:text-blue-600'
-                          }`}
-                          title="Increase Priority (Move Up)"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="text-[10px] font-mono font-bold text-slate-500">
-                          #{acc.priority}
-                        </span>
-                        <button
-                          disabled={index === accounts.length - 1}
-                          onClick={() => handleMovePriority(index, 'down')}
-                          className={`p-1 rounded-lg neo-btn transition-colors ${
-                            index === accounts.length - 1
-                              ? 'opacity-30 cursor-not-allowed text-slate-300'
-                              : 'text-slate-600 hover:text-blue-600'
-                          }`}
-                          title="Decrease Priority (Move Down)"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {accounts.length > 1 && (
+                        <div className="flex flex-col items-center gap-0.5 shrink-0">
+                          <button
+                            disabled={index === 0}
+                            onClick={() => handleMovePriority(index, 'up')}
+                            className={`p-1 rounded-lg transition-colors ${
+                              index === 0
+                                ? 'opacity-25 cursor-not-allowed text-slate-400'
+                                : 'neo-btn text-slate-600 hover:text-blue-600'
+                            }`}
+                            title="Move Up"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">
+                            #{index + 1}
+                          </span>
+                          <button
+                            disabled={index === accounts.length - 1}
+                            onClick={() => handleMovePriority(index, 'down')}
+                            className={`p-1 rounded-lg transition-colors ${
+                              index === accounts.length - 1
+                                ? 'opacity-25 cursor-not-allowed text-slate-400'
+                                : 'neo-btn text-slate-600 hover:text-blue-600'
+                            }`}
+                            title="Move Down"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="w-10 h-10 rounded-2xl neo-raised-sm flex items-center justify-center shrink-0">
+                        <HardDrive className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                       </div>
 
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${
-                            isActive ? (isFull ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-slate-400'
-                          }`} />
-                          <span className="text-sm font-bold text-slate-800 font-mono">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-slate-800 truncate">
                             {acc.googleAccountEmail}
                           </span>
                           {index === 0 && isActive && (
-                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                               Primary
                             </span>
                           )}
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-3">
-                          <span>Status: <strong className={isActive ? 'text-emerald-700' : 'text-slate-500'}>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              isActive
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-600'
+                            }`}
+                          >
                             {isActive ? 'Active' : 'Disconnected'}
-                          </strong></span>
-                          <span>•</span>
-                          <span>Photos: <strong className="text-slate-800 font-mono">{acc.photoCount}</strong></span>
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-2.5 tabular-nums">
+                          <span>{acc.photoCount} photos</span>
+                          <span className="text-slate-300">•</span>
+                          <span>{formatBytes(acc.storageAvailable)} free</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       <button
                         onClick={() => handleRefreshStats(acc)}
                         disabled={refreshingId === acc.id}
-                        className="p-2 rounded-xl neo-btn text-slate-600 hover:text-blue-600 transition-colors"
-                        title="Check Fresh Quota from Google Drive API"
+                        className="p-2 rounded-xl neo-btn text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                        title="Refresh Drive Quota"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === acc.id ? 'animate-spin text-blue-600' : ''}`} />
                       </button>
@@ -459,7 +477,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                       {isActive ? (
                         <button
                           onClick={() => setAccountToDisconnect(acc)}
-                          className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                           Disconnect
                         </button>
@@ -475,27 +493,26 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
 
                       <button
                         onClick={() => setAccountToDelete(acc)}
-                        className="px-3 py-1.5 rounded-xl neo-btn text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5"
-                        title="Delete Storage from PixSort"
+                        className="p-2 rounded-xl neo-btn text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        title="Remove Account"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Storage Bar (Section 3 & 17) */}
-                  <div className="mt-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-600 font-medium">
-                        {formatBytes(acc.storageUsed)} / {formatBytes(acc.storageLimit)} used
+                  {/* Storage Bar */}
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 tabular-nums">
+                      <span>
+                        {formatBytes(acc.storageUsed)} of {formatBytes(acc.storageLimit)} used
                       </span>
-                      <span className={`font-bold ${isFull ? 'text-amber-700' : 'text-slate-700'}`}>
+                      <span className={`font-semibold ${isFull ? 'text-amber-700' : 'text-slate-700'}`}>
                         {pct}%
                       </span>
                     </div>
 
-                    <div className="w-full h-2.5 rounded-full neo-inset bg-slate-200 overflow-hidden">
+                    <div className="w-full h-2 rounded-full neo-inset-sm overflow-hidden p-0.5">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
                           pct >= 95
@@ -504,13 +521,8 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
                             ? 'bg-amber-500'
                             : 'bg-blue-600'
                         }`}
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${Math.max(pct, 2)}%` }}
                       />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
-                      <span>Available: {formatBytes(acc.storageAvailable)}</span>
-                      <span>Folder: AI Photo Search/Photos/</span>
                     </div>
                   </div>
                 </div>
@@ -518,16 +530,6 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
             })}
           </div>
         )}
-
-        <div className="pt-2">
-          <button
-            onClick={() => setShowConnectModal(true)}
-            className="w-full py-3 rounded-2xl neo-btn text-xs font-bold text-slate-700 hover:text-blue-700 flex items-center justify-center gap-2 border border-slate-200/50 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-blue-600" />
-            <span>+ Connect Another Google Drive</span>
-          </button>
-        </div>
       </div>
 
       {/* Disconnect Warning Modal (Section 15 requirement) */}

@@ -13,6 +13,8 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { Photo, Album } from '../../src/types.js';
+import { vectorSearchService } from './vectorSearch.js';
+import { semanticSearchEngine } from './semanticSearch.js';
 
 try {
   setLogLevel('error');
@@ -50,9 +52,137 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   return clean as Partial<T>;
 }
 
+function toFirestoreValue(val: any): Record<string, any> {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map((v) => toFirestoreValue(v)) } };
+  }
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) fields[k] = toFirestoreValue(v);
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function fromFirestoreValue(val: Record<string, any>): any {
+  if (!val || 'nullValue' in val) return null;
+  if ('booleanValue' in val) return Boolean(val.booleanValue);
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return Number(val.doubleValue);
+  if ('stringValue' in val) return String(val.stringValue);
+  if ('arrayValue' in val) {
+    return Array.isArray(val.arrayValue?.values)
+      ? val.arrayValue.values.map((v: any) => fromFirestoreValue(v))
+      : [];
+  }
+  if ('mapValue' in val) {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val.mapValue?.fields || {})) {
+      out[k] = fromFirestoreValue(v as Record<string, any>);
+    }
+    return out;
+  }
+  return null;
+}
+
+async function firestoreRestQuery(
+  collectionName: string,
+  userId: string,
+  idToken: string
+): Promise<Record<string, any>[]> {
+  if (!firestoreProject) return [];
+  const url = `https://firestore.googleapis.com/v1/projects/${firestoreProject}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: collectionName }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'userId' },
+            op: 'EQUAL',
+            value: { stringValue: userId },
+          },
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => String(res.status));
+    throw new Error(`Firestore REST query ${res.status}: ${errText}`);
+  }
+  const rows = (await res.json()) as Array<{ document?: { fields?: Record<string, any> } }>;
+  const docs: Record<string, any>[] = [];
+  for (const row of rows) {
+    if (!row.document?.fields) continue;
+    const obj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row.document.fields)) {
+      obj[k] = fromFirestoreValue(v);
+    }
+    docs.push(obj);
+  }
+  return docs;
+}
+
+async function firestoreRestWrite(
+  method: 'PATCH' | 'DELETE',
+  collectionName: string,
+  docId: string,
+  data: Record<string, any> | null,
+  idToken: string,
+  isPartialUpdate = false
+): Promise<void> {
+  if (!firestoreProject) return;
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${firestoreProject}/databases/(default)/documents/${collectionName}/${encodeURIComponent(docId)}`;
+  let url = baseUrl;
+  let body: string | undefined;
+
+  if (method === 'PATCH' && data) {
+    const clean = stripUndefined(data);
+    const keys = Object.keys(clean);
+    if (keys.length === 0) return;
+    if (isPartialUpdate) {
+      const mask = keys.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+      url = `${baseUrl}?${mask}`;
+    }
+    const fields: Record<string, any> = {};
+    for (const k of keys) {
+      fields[k] = toFirestoreValue(clean[k]);
+    }
+    body = JSON.stringify({ fields });
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body,
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => String(res.status));
+    throw new Error(`Firestore REST ${res.status}: ${errText}`);
+  }
+}
+
 export class FirestoreDatabaseService {
   private photos: Map<string, Photo> = new Map();
   private albums: Map<string, Album> = new Map();
+  private hydratedUsers: Set<string> = new Set();
+  private hydrationInFlight: Map<string, Promise<void>> = new Map();
   private syncPromise: Promise<void>;
 
   constructor() {
@@ -105,13 +235,85 @@ export class FirestoreDatabaseService {
     }
   }
 
+  /**
+   * Hydrates a specific user's photos & albums from Firestore using their verified ID token
+   * (needed after server restarts when Firestore rules require request.auth != null).
+   */
+  async ensureUserHydrated(userId: string, idToken?: string): Promise<void> {
+    if (!idToken || this.hydratedUsers.has(userId) || userId.startsWith('guest_')) return;
+    const existing = this.hydrationInFlight.get(userId);
+    if (existing) {
+      await existing;
+      return;
+    }
+
+    const promise = (async () => {
+      try {
+        const [userPhotos, userAlbums] = await Promise.all([
+          firestoreRestQuery('photos', userId, idToken),
+          firestoreRestQuery('albums', userId, idToken),
+        ]);
+
+        for (const raw of userPhotos) {
+          const photo = {
+            ...raw,
+            objects: Array.isArray(raw.objects) ? raw.objects : [],
+            activities: Array.isArray(raw.activities) ? raw.activities : [],
+            albumIds: Array.isArray(raw.albumIds) ? raw.albumIds : [],
+          } as Photo;
+          if (!photo.id) continue;
+          this.photos.set(photo.id, photo);
+
+          if (!photo.isTrash && !vectorSearchService.getVector(photo.id)) {
+            const textContext = `${photo.aiDescription || ''} ${photo.objects.join(' ')} ${photo.activities.join(' ')} ${photo.environment || ''} ${photo.time || ''} ${photo.location || ''}`;
+            const vector = semanticSearchEngine.generateDenseVector(textContext);
+            await vectorSearchService.upsertVector({
+              id: photo.id,
+              userId: photo.userId,
+              vector,
+              metadata: {
+                dateTaken: photo.dateTaken,
+                location: photo.location,
+                isFavorite: photo.isFavorite,
+                albumIds: photo.albumIds,
+                isTrash: photo.isTrash,
+              },
+            });
+          }
+        }
+
+        for (const raw of userAlbums) {
+          const album = raw as Album;
+          if (album.id) this.albums.set(album.id, album);
+        }
+
+        this.hydratedUsers.add(userId);
+        if (userPhotos.length > 0 || userAlbums.length > 0) {
+          console.log(`[Firestore] Hydrated ${userPhotos.length} photos & ${userAlbums.length} albums for user ${userId}.`);
+        }
+      } catch (err: any) {
+        console.warn(`[Firestore] User hydration warning for ${userId}:`, err.message);
+      } finally {
+        this.hydrationInFlight.delete(userId);
+      }
+    })();
+
+    this.hydrationInFlight.set(userId, promise);
+    await promise;
+  }
+
   // --- Photo Operations ---
 
-  async getPhotos(userId: string, filters?: {
-    albumId?: string;
-    isFavorite?: boolean;
-    isTrash?: boolean;
-  }): Promise<Photo[]> {
+  async getPhotos(
+    userId: string,
+    filters?: {
+      albumId?: string;
+      isFavorite?: boolean;
+      isTrash?: boolean;
+    },
+    idToken?: string
+  ): Promise<Photo[]> {
+    await this.ensureUserHydrated(userId, idToken);
     let list = Array.from(this.photos.values()).filter((p) => p.userId === userId);
 
     if (filters?.isTrash !== undefined) {
@@ -159,10 +361,16 @@ export class FirestoreDatabaseService {
     return null;
   }
 
-  async createPhoto(photo: Photo): Promise<Photo> {
+  async createPhoto(photo: Photo, idToken?: string): Promise<Photo> {
     this.photos.set(photo.id, photo);
 
-    if (firestoreDb) {
+    if (idToken) {
+      try {
+        await firestoreRestWrite('PATCH', 'photos', photo.id, photo, idToken, false);
+      } catch (err: any) {
+        console.warn(`[Firestore] Failed to persist photo ${photo.id}:`, err.message);
+      }
+    } else if (firestoreDb && !photo.userId.startsWith('guest_')) {
       try {
         await setDoc(doc(firestoreDb, 'photos', photo.id), stripUndefined(photo));
       } catch (err: any) {
@@ -173,7 +381,7 @@ export class FirestoreDatabaseService {
     return photo;
   }
 
-  async updatePhoto(photoId: string, updates: Partial<Photo>): Promise<Photo | null> {
+  async updatePhoto(photoId: string, updates: Partial<Photo>, idToken?: string): Promise<Photo | null> {
     const existing = this.photos.get(photoId);
     if (!existing) return null;
 
@@ -181,21 +389,36 @@ export class FirestoreDatabaseService {
     const updated = { ...existing, ...cleanUpdates };
     this.photos.set(photoId, updated);
 
-    if (firestoreDb && Object.keys(cleanUpdates).length > 0) {
-      try {
-        await updateDoc(doc(firestoreDb, 'photos', photoId), cleanUpdates);
-      } catch (err: any) {
-        console.warn(`[Firestore] Failed to update photo ${photoId}:`, err.message);
+    if (Object.keys(cleanUpdates).length > 0) {
+      if (idToken) {
+        try {
+          await firestoreRestWrite('PATCH', 'photos', photoId, cleanUpdates, idToken, true);
+        } catch (err: any) {
+          console.warn(`[Firestore] Failed to update photo ${photoId}:`, err.message);
+        }
+      } else if (firestoreDb && !existing.userId.startsWith('guest_')) {
+        try {
+          await updateDoc(doc(firestoreDb, 'photos', photoId), cleanUpdates);
+        } catch (err: any) {
+          console.warn(`[Firestore] Failed to update photo ${photoId}:`, err.message);
+        }
       }
     }
 
     return updated;
   }
 
-  async deletePhoto(photoId: string, permanent: boolean = false): Promise<boolean> {
+  async deletePhoto(photoId: string, permanent: boolean = false, idToken?: string): Promise<boolean> {
+    const existing = this.photos.get(photoId);
     if (permanent) {
       const res = this.photos.delete(photoId);
-      if (firestoreDb) {
+      if (idToken) {
+        try {
+          await firestoreRestWrite('DELETE', 'photos', photoId, null, idToken);
+        } catch (err: any) {
+          console.warn(`[Firestore] Failed to delete photo ${photoId}:`, err.message);
+        }
+      } else if (firestoreDb && existing && !existing.userId.startsWith('guest_')) {
         try {
           await deleteDoc(doc(firestoreDb, 'photos', photoId));
         } catch (err: any) {
@@ -204,11 +427,16 @@ export class FirestoreDatabaseService {
       }
       return res;
     } else {
-      const existing = this.photos.get(photoId);
       if (!existing) return false;
       existing.isTrash = true;
       this.photos.set(photoId, existing);
-      if (firestoreDb) {
+      if (idToken) {
+        try {
+          await firestoreRestWrite('PATCH', 'photos', photoId, { isTrash: true }, idToken, true);
+        } catch (err: any) {
+          console.warn(`[Firestore] Failed to mark photo ${photoId} as trash:`, err.message);
+        }
+      } else if (firestoreDb && !existing.userId.startsWith('guest_')) {
         try {
           await updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: true });
         } catch (err: any) {
@@ -219,12 +447,18 @@ export class FirestoreDatabaseService {
     }
   }
 
-  async restorePhoto(photoId: string): Promise<boolean> {
+  async restorePhoto(photoId: string, idToken?: string): Promise<boolean> {
     const existing = this.photos.get(photoId);
     if (!existing) return false;
     existing.isTrash = false;
     this.photos.set(photoId, existing);
-    if (firestoreDb) {
+    if (idToken) {
+      try {
+        await firestoreRestWrite('PATCH', 'photos', photoId, { isTrash: false }, idToken, true);
+      } catch (err: any) {
+        console.warn(`[Firestore] Failed to restore photo ${photoId}:`, err.message);
+      }
+    } else if (firestoreDb && !existing.userId.startsWith('guest_')) {
       try {
         await updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: false });
       } catch (err: any) {
@@ -240,7 +474,8 @@ export class FirestoreDatabaseService {
     return this.albums.get(albumId) || null;
   }
 
-  async getAlbums(userId: string): Promise<Album[]> {
+  async getAlbums(userId: string, idToken?: string): Promise<Album[]> {
+    await this.ensureUserHydrated(userId, idToken);
     const albums = Array.from(this.albums.values()).filter((a) => a.userId === userId);
     return albums.map((alb) => {
       const albumPhotos = Array.from(this.photos.values()).filter(
@@ -254,7 +489,7 @@ export class FirestoreDatabaseService {
     });
   }
 
-  async createAlbum(userId: string, name: string): Promise<Album> {
+  async createAlbum(userId: string, name: string, idToken?: string): Promise<Album> {
     const id = `album_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newAlbum: Album = {
       id,
@@ -265,7 +500,13 @@ export class FirestoreDatabaseService {
     };
     this.albums.set(id, newAlbum);
 
-    if (firestoreDb) {
+    if (idToken) {
+      try {
+        await firestoreRestWrite('PATCH', 'albums', id, newAlbum, idToken, false);
+      } catch (err: any) {
+        console.warn(`[Firestore] Failed to persist album ${id}:`, err.message);
+      }
+    } else if (firestoreDb && !userId.startsWith('guest_')) {
       try {
         await setDoc(doc(firestoreDb, 'albums', id), newAlbum);
       } catch (err: any) {
@@ -276,17 +517,26 @@ export class FirestoreDatabaseService {
     return newAlbum;
   }
 
-  async deleteAlbum(albumId: string): Promise<boolean> {
+  async deleteAlbum(albumId: string, idToken?: string): Promise<boolean> {
+    const existingAlbum = this.albums.get(albumId);
     for (const photo of this.photos.values()) {
       if (photo.albumIds.includes(albumId)) {
         photo.albumIds = photo.albumIds.filter((id) => id !== albumId);
-        if (firestoreDb) {
+        if (idToken) {
+          firestoreRestWrite('PATCH', 'photos', photo.id, { albumIds: photo.albumIds }, idToken, true).catch(() => {});
+        } else if (firestoreDb && !photo.userId.startsWith('guest_')) {
           updateDoc(doc(firestoreDb, 'photos', photo.id), { albumIds: photo.albumIds }).catch(() => {});
         }
       }
     }
 
-    if (firestoreDb) {
+    if (idToken) {
+      try {
+        await firestoreRestWrite('DELETE', 'albums', albumId, null, idToken);
+      } catch {
+        // ignore
+      }
+    } else if (firestoreDb && existingAlbum && !existingAlbum.userId.startsWith('guest_')) {
       try {
         await deleteDoc(doc(firestoreDb, 'albums', albumId));
       } catch {
@@ -297,7 +547,7 @@ export class FirestoreDatabaseService {
     return this.albums.delete(albumId);
   }
 
-  async togglePhotoAlbum(photoId: string, albumId: string): Promise<Photo | null> {
+  async togglePhotoAlbum(photoId: string, albumId: string, idToken?: string): Promise<Photo | null> {
     const photo = this.photos.get(photoId);
     if (!photo) return null;
 
@@ -308,7 +558,13 @@ export class FirestoreDatabaseService {
     }
     this.photos.set(photoId, photo);
 
-    if (firestoreDb) {
+    if (idToken) {
+      try {
+        await firestoreRestWrite('PATCH', 'photos', photoId, { albumIds: photo.albumIds }, idToken, true);
+      } catch {
+        // ignore
+      }
+    } else if (firestoreDb && !photo.userId.startsWith('guest_')) {
       try {
         await updateDoc(doc(firestoreDb, 'photos', photoId), { albumIds: photo.albumIds });
       } catch {
