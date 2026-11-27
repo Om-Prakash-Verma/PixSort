@@ -1,17 +1,19 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { dbService } from '../services/database.js';
 import { aiService } from '../services/ai.js';
 import { vectorSearchService } from '../services/vectorSearch.js';
-import { storageService, driveStorageService } from '../services/storage.js';
+import { driveStorageService } from '../services/storage.js';
+import { AuthenticatedRequest, requireAuth } from '../middleware/auth.js';
 import { SystemStatus } from '../../src/types.js';
 
 export const systemRouter = Router();
 
-// System status
-systemRouter.get('/status', (req: Request, res: Response) => {
-  const userId = (req.headers['x-user-id'] as string) || (req.query.userId as string);
+systemRouter.use(requireAuth);
+
+// System status (scoped to authenticated user)
+systemRouter.get('/status', (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
   const stats = dbService.getStats(userId);
-  const cloudStorageStatus = storageService.getCloudStatus(userId);
   const pooled = driveStorageService.getPooledStats(userId);
 
   const status: SystemStatus = {
@@ -22,6 +24,8 @@ systemRouter.get('/status', (req: Request, res: Response) => {
     totalPhotosCount: stats.total,
     readyPhotosCount: stats.ready,
     processingCount: stats.processing,
+    favoritesCount: stats.favorites,
+    trashCount: stats.trash,
     firestoreConnected: stats.firestoreConnected,
     firebaseProjectId: stats.firebaseProjectId,
     // Google Drive Pooled Storage
@@ -40,22 +44,24 @@ systemRouter.get('/status', (req: Request, res: Response) => {
   res.json(status);
 });
 
-// Clear all data (photos and albums)
-systemRouter.post('/data/clear', async (req: Request, res: Response) => {
+// Clear current user's data (photos and albums)
+systemRouter.post('/data/clear', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    vectorSearchService.clear();
-    await dbService.clearAllData();
-    res.json({ message: 'All photos and albums have been removed.' });
+    const userId = req.userId!;
+    vectorSearchService.clearUser(userId);
+    await dbService.clearUserData(userId);
+    res.json({ message: 'Your photos and albums have been removed.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-systemRouter.post('/demo/reset', async (req: Request, res: Response) => {
+systemRouter.post('/demo/reset', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    vectorSearchService.clear();
-    await dbService.clearAllData();
-    res.json({ message: 'All demo data removed.' });
+    const userId = req.userId!;
+    vectorSearchService.clearUser(userId);
+    await dbService.clearUserData(userId);
+    res.json({ message: 'Your demo data has been removed.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -7,9 +7,30 @@ import { driveStorageService } from '../services/driveStorage.js';
 
 export const mediaRouter = Router();
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function resolveSafeUploadPath(rawFile: string): string | null {
+  const safeName = path.basename(rawFile);
+  if (!safeName || safeName === '.' || safeName === '..') return null;
+  const resolved = path.resolve(UPLOADS_DIR, safeName);
+  const baseWithSep = path.resolve(UPLOADS_DIR) + path.sep;
+  if (!resolved.startsWith(baseWithSep)) return null;
+  return resolved;
+}
+
 mediaRouter.get('/:file', async (req: Request, res: Response) => {
-  const filename = req.params.file;
-  const localFilePath = path.join(UPLOADS_DIR, filename);
+  const safeFilename = path.basename(req.params.file || '');
+  const localFilePath = resolveSafeUploadPath(safeFilename);
+  if (!localFilePath) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
 
   // 1. If file already exists locally in cache, serve it immediately
   if (fs.existsSync(localFilePath)) {
@@ -17,7 +38,7 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
   }
 
   // 2. Fetch associated photo record from database to find Google Drive references
-  const photo = dbService.getPhotoByFilenameOrId(filename);
+  const photo = dbService.getPhotoByFilenameOrId(safeFilename);
 
   // 3. If photo has Google Drive account association, download from Google Drive
   const driveAccountId = photo?.driveAccountId || 'drive_acc_om';
@@ -27,14 +48,10 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
       const driveFile = await driveStorageService.downloadFile(
         driveAccountId,
         driveFileId,
-        filename
+        safeFilename
       );
       if (driveFile) {
-        try {
-          fs.writeFileSync(localFilePath, driveFile.buffer);
-        } catch {
-          // ignore
-        }
+        fs.promises.writeFile(localFilePath, driveFile.buffer).catch(() => {});
         res.setHeader('Content-Type', driveFile.mimeType || 'image/jpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.send(driveFile.buffer);
@@ -45,20 +62,16 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
   }
 
   // Check if file is in managed Drive folder
-  const localDriveFile = await driveStorageService.downloadFile(driveAccountId, '', filename);
+  const localDriveFile = await driveStorageService.downloadFile(driveAccountId, '', safeFilename);
   if (localDriveFile) {
-    try {
-      fs.writeFileSync(localFilePath, localDriveFile.buffer);
-    } catch {
-      // ignore
-    }
+    fs.promises.writeFile(localFilePath, localDriveFile.buffer).catch(() => {});
     res.setHeader('Content-Type', localDriveFile.mimeType || 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(localDriveFile.buffer);
   }
 
-  // 4. If it is an Unsplash sample photo (e.g. photo-1464863979621-258859e62245.avif)
-  const candidateName = (photo?.filename || '') + ' ' + filename;
+  // 4. If it is an Unsplash sample photo
+  const candidateName = (photo?.filename || '') + ' ' + safeFilename;
   const unsplashMatch = candidateName.match(/photo-\d+-[a-zA-Z0-9]+/);
 
   if (unsplashMatch) {
@@ -68,8 +81,7 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
       if (remoteRes.ok) {
         const arrayBuf = await remoteRes.arrayBuffer();
         const buffer = Buffer.from(arrayBuf);
-        // Cache locally so subsequent requests never have to re-fetch
-        fs.writeFileSync(localFilePath, buffer);
+        fs.promises.writeFile(localFilePath, buffer).catch(() => {});
         res.setHeader('Content-Type', remoteRes.headers.get('content-type') || 'image/jpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.send(buffer);
@@ -79,8 +91,9 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
     }
   }
 
-  // 5. Graceful SVG fallback card for Google Drive synced photos not present on local disk
-  const driveEmail = photo?.driveAccountEmail || 'Personal Google Drive';
+  // 5. Graceful SVG fallback card (XML-escaped to prevent XSS)
+  const driveEmail = escapeXml(photo?.driveAccountEmail || 'Personal Google Drive');
+  const escapedFilename = escapeXml(safeFilename);
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.send(`
@@ -93,7 +106,7 @@ mediaRouter.get('/:file', async (req: Request, res: Response) => {
       <text x="300" y="255" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="16" fill="#1E293B" text-anchor="middle">Google Drive Storage</text>
       <text x="300" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">Stored in account: ${driveEmail}</text>
       <text x="300" y="305" font-family="monospace" font-size="11" fill="#3B82F6" text-anchor="middle">AI Photo Search/Photos</text>
-      <text x="300" y="330" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">${filename}</text>
+      <text x="300" y="330" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">${escapedFilename}</text>
     </svg>
   `);
 });

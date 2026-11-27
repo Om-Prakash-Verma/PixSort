@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Sparkles, MapPin, Calendar, Clock, Layers, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Heart, Sparkles, MapPin, Calendar, Layers, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Photo } from '../types.js';
 
 interface PhotoCardProps {
@@ -25,6 +25,11 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   const [hasError, setHasError] = useState(false);
   const isReady = photo.processingStatus === 'READY';
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setImageLoaded(false);
+    setHasError(false);
+  }, [photo.thumbnailUrl, photo.url]);
 
   // Auto-scroll into view when focused via keyboard navigation
   useEffect(() => {

@@ -79,6 +79,8 @@ export interface SystemStatus {
   totalPhotosCount: number;
   readyPhotosCount: number;
   processingCount: number;
+  favoritesCount?: number;
+  trashCount?: number;
   firestoreConnected?: boolean;
   firebaseProjectId?: string;
   // Google Drive Pooled Storage

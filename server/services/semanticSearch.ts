@@ -1,6 +1,7 @@
 import { Photo, SearchResponse } from '../../src/types.js';
 import { dbService } from './database.js';
 import { vectorSearchService } from './vectorSearch.js';
+import { aiService } from './ai.js';
 
 export interface SemanticConcept {
   id: string;
@@ -174,6 +175,7 @@ export class SemanticSearchEngine {
     }
 
     // 2. Detect Date / Temporal Intent
+    const currentYear = String(new Date().getFullYear());
     const monthPatterns: Record<string, string> = {
       january: '01', feb: '02', february: '02', mar: '03', march: '03',
       apr: '04', april: '04', may: '05', jun: '06', june: '06',
@@ -183,9 +185,11 @@ export class SemanticSearchEngine {
     };
 
     for (const [month, num] of Object.entries(monthPatterns)) {
-      const reg = new RegExp(`\\b(in |from |of )?${month}( 2026| 2025)?\\b`, 'i');
-      if (reg.test(q)) {
-        dateFilter = `2026-${num}`;
+      const reg = new RegExp(`\\b(?:in |from |of )?${month}(?: (20\\d{2}))?\\b`, 'i');
+      const match = q.match(reg);
+      if (match) {
+        const year = match[1] || currentYear;
+        dateFilter = `${year}-${num}`;
         cleaned = cleaned.replace(reg, '').trim();
         break;
       }
@@ -193,10 +197,10 @@ export class SemanticSearchEngine {
 
     if (!dateFilter) {
       if (/\b(last )?summer\b/i.test(q)) {
-        dateFilter = '2026-07';
+        dateFilter = `${currentYear}-07`;
         cleaned = cleaned.replace(/\b(in |from )?(last )?summer\b/gi, '').trim();
       } else if (/\b(last )?winter\b/i.test(q)) {
-        dateFilter = '2026-01';
+        dateFilter = `${currentYear}-01`;
         cleaned = cleaned.replace(/\b(in |from )?(last )?winter\b/gi, '').trim();
       }
     }
@@ -329,8 +333,11 @@ export class SemanticSearchEngine {
       : intent.favoriteOnly;
     const effectiveAlbum = filtersOverride?.albumId || intent.albumFilter;
 
-    // Step 1: Generate high-dimensional query vector locally (0 API calls)
-    const queryVector = this.generateDenseVector(intent.cleanedQuery);
+    // Step 1: Generate query vector matching the user's indexed embedding space
+    const useGemini3072 = aiService.getHasKey() && vectorSearchService.hasVectorsWithDimension(userId, 3072);
+    const queryVector = useGemini3072
+      ? await aiService.embedText(intent.cleanedQuery)
+      : this.generateDenseVector(intent.cleanedQuery);
 
     // Step 2: Query Nearest Neighbors via Vector Search
     const vectorMatches = await vectorSearchService.queryNearestNeighbors(

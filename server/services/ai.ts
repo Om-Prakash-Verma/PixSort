@@ -114,7 +114,7 @@ export class GeminiAIService {
   async embedImage(base64Data: string, mimeType: string = 'image/jpeg'): Promise<number[]> {
     const client = this.getClient();
     if (client) {
-      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      const cleanBase64 = base64Data.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const response = await client.models.embedContent({
@@ -167,7 +167,7 @@ export class GeminiAIService {
     const client = this.getClient();
 
     if (client) {
-      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      const cleanBase64 = base64Data.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
       console.log(`[Gemini Vision] Initiating vision analysis for photo "${filename || 'unnamed'}"...`);
 
       for (const model of VISION_MODELS) {

@@ -1,30 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Check if the user is authenticated via Firebase Auth
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Photos: users can read/write their own photos
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Photos: users can only read/write their own photos
     match /photos/{photoId} {
-      allow read, write: if true;
+      allow read, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId) && isOwner(request.resource.data.userId);
     }
 
-    // Albums: users can read/write their own albums
+    // Albums: users can only read/write their own albums
     match /albums/{albumId} {
-      allow read, write: if true;
+      allow read, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId) && isOwner(request.resource.data.userId);
     }
 
-    // Connected Google Drive Accounts: users can access their pooled accounts
+    // Connected Google Drive Accounts: users can only access their own pooled accounts
     match /drive_accounts/{accountId} {
-      allow read, write: if true;
+      allow read, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId) && isOwner(request.resource.data.userId);
     }
 
-    // Users Collection: users can read/write their profile
+    // Users Collection: users can only read/write their own profile
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if isOwner(userId);
     }
   }
 }

@@ -8,10 +8,9 @@ import {
   Cpu,
   CheckCircle2,
   HardDrive,
-  Database,
   Presentation,
   LogOut,
-  User,
+  X,
 } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 import { AuthUser } from './AuthModal.js';
@@ -28,6 +27,8 @@ interface SidebarProps {
   onOpenPresentation?: () => void;
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -40,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenPresentation,
   currentUser,
   onLogout,
+  isMobileOpen = false,
+  onCloseMobile,
 }) => {
   const navItems = [
     { id: 'photos' as ActiveTab, label: 'Photos', icon: Image },
@@ -56,19 +59,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="sidebar w-64 shrink-0 bg-[#EEF2F6] neo-raised rounded-3xl border border-white/70 p-4 my-4 ml-4 mb-4 flex flex-col justify-between hidden md:flex sticky top-4 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto z-20 shadow-sm transition-all duration-200">
-      {/* Navigation Links */}
-      <div className="space-y-1.5">
-        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">
-          Library & Storage
-        </div>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
+    <>
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden"
+          onClick={onCloseMobile}
+        />
+      )}
+      <aside
+        className={`sidebar w-64 shrink-0 bg-[#EEF2F6] neo-raised rounded-3xl border border-white/70 p-4 flex-col justify-between overflow-y-auto shadow-sm transition-all duration-200 ${
+          isMobileOpen
+            ? 'fixed inset-y-3 left-3 z-50 flex max-h-[calc(100vh-1.5rem)]'
+            : 'hidden md:flex my-4 ml-4 mb-4 sticky top-4 self-start max-h-[calc(100vh-5.5rem)] z-20'
+        }`}
+      >
+        {/* Navigation Links */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Library & Storage
+            </span>
+            {isMobileOpen && onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                className="md:hidden p-1 rounded-lg neo-btn text-slate-500"
+                aria-label="Close navigation menu"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  onTabChange(item.id);
+                  onCloseMobile?.();
+                }}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
                 isActive
                   ? 'neo-inset text-blue-700 font-bold'
@@ -202,5 +232,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
     </aside>
+    </>
   );
 };

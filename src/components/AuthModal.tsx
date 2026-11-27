@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Mail,
   Lock,
   Sparkles,
-  ShieldCheck,
   AlertCircle,
   ArrowRight,
   User,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getFirebaseAuthInstance } from '../utils/api.js';
 
 export interface AuthUser {
   uid: string;
@@ -39,22 +39,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setError(null);
+    }
+  }, [isOpen, initialMode]);
+
   if (!isOpen) return null;
 
   // Initialize Firebase Auth on demand
   const getFirebaseAuth = async () => {
-    const configRes = await fetch('/api/drive/config');
-    if (!configRes.ok) {
+    const auth = await getFirebaseAuthInstance();
+    if (!auth) {
       throw new Error('Firebase configuration not available');
     }
-    const config = await configRes.json();
-
-    const { initializeApp, getApps } = await import('firebase/app');
-    const { getAuth } = await import('firebase/auth');
-
-    const apps = getApps();
-    const app = apps.length > 0 ? apps[0] : initializeApp(config);
-    return getAuth(app);
+    return auth;
   };
 
   // 1-Click Google Sign-In via Popup
@@ -157,7 +157,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === 'signin' ? 'Sign In' : 'Create Account'}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+      >
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

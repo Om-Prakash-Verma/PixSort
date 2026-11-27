@@ -85,7 +85,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (confirm(`Delete album "${album.name}"?`)) {
-                      onDeleteAlbum(album.id);
+                      Promise.resolve(onDeleteAlbum(album.id)).catch(() => {});
                     }
                   }}
                   className="absolute top-2 right-2 p-1.5 rounded-xl bg-slate-900/60 hover:bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"

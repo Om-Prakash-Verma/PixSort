@@ -140,7 +140,7 @@ export class GoogleDriveStorageProvider {
   public async getAccounts(userId?: string): Promise<ConnectedDriveAccount[]> {
     await this.syncPhotoCounts(userId);
     const all = Array.from(this.accounts.values());
-    const filtered = userId ? all.filter((a) => a.userId === userId || a.userId === 'user_default') : all;
+    const filtered = userId ? all.filter((a) => a.userId === userId) : all;
     return filtered.sort((a, b) => a.priority - b.priority);
   }
 
@@ -152,37 +152,7 @@ export class GoogleDriveStorageProvider {
   }
 
   /**
-   * Selects an account for upload according to priority order and available space.
-   * Throws StorageQuotaExceededError if no active account can accept the file.
-   */
-  public async allocateAccountForUpload(fileSizeBytes: number, userId?: string): Promise<ConnectedDriveAccount> {
-    const accounts = await this.getAccounts(userId);
-    const sortedAccounts = accounts
-      .filter((a) => a.status === 'active')
-      .sort((a, b) => a.priority - b.priority);
-
-    if (sortedAccounts.length === 0) {
-      throw new StorageQuotaExceededError(
-        'No active Google Drive accounts connected. Please connect a Google Drive account in Storage Settings.'
-      );
-    }
-
-    for (const acc of sortedAccounts) {
-      // Refresh current quota if OAuth token exists
-      await this.refreshQuotaFromDrive(acc.id);
-
-      if (acc.storageAvailable >= fileSizeBytes) {
-        return acc;
-      }
-    }
-
-    throw new StorageQuotaExceededError(
-      'Your connected Google Drive accounts do not have enough available storage for this upload.'
-    );
-  }
-
-  /**
-   * Connect a new Google Drive account
+   * Connect a new Google Drive account (scoped to userId to prevent cross-tenant takeover)
    */
   public async connectAccount(data: {
     userId?: string;
@@ -193,13 +163,15 @@ export class GoogleDriveStorageProvider {
     storageUsed?: number;
   }): Promise<ConnectedDriveAccount> {
     const FIFTEEN_GB = 15 * 1024 * 1024 * 1024;
+    const targetUserId = data.userId || 'user_default';
     const existing = Array.from(this.accounts.values()).find(
-      (a) => a.googleAccountEmail.toLowerCase() === data.googleAccountEmail.toLowerCase()
+      (a) =>
+        a.userId === targetUserId &&
+        a.googleAccountEmail.toLowerCase() === data.googleAccountEmail.toLowerCase()
     );
 
     if (existing) {
       existing.status = 'active';
-      if (data.userId) existing.userId = data.userId;
       existing.updatedAt = new Date().toISOString();
       if (data.credentials) {
         this.credentials.set(existing.id, data.credentials);
@@ -287,19 +259,54 @@ export class GoogleDriveStorageProvider {
   }
 
   /**
-   * Reorder accounts priority
+   * Reorder accounts priority (scoped to userId)
    */
-  public async reorderAccounts(accountIds: string[]): Promise<ConnectedDriveAccount[]> {
+  public async reorderAccounts(accountIds: string[], userId?: string): Promise<ConnectedDriveAccount[]> {
     accountIds.forEach((id, index) => {
       const acc = this.accounts.get(id);
-      if (acc) {
+      if (acc && (!userId || acc.userId === userId)) {
         acc.priority = index + 1;
         acc.updatedAt = new Date().toISOString();
       }
     });
 
     this.saveAccountsToFile();
-    return this.getAccounts();
+    return this.getAccounts(userId);
+  }
+
+  /**
+   * Attempts to refresh an expired Google OAuth access token using the stored refreshToken
+   */
+  private async refreshAccessToken(accountId: string): Promise<string | null> {
+    const creds = this.credentials.get(accountId);
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!creds?.refreshToken || !clientId || !clientSecret) return null;
+
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: creds.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+      if (!res.ok) return null;
+      const tokens = await res.json();
+      if (tokens.access_token) {
+        creds.accessToken = tokens.access_token;
+        creds.expiresAt = Date.now() + (tokens.expires_in || 3600) * 1000;
+        this.credentials.set(accountId, creds);
+        this.saveAccountsToFile();
+        return creds.accessToken || null;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
   }
 
   /**
@@ -345,9 +352,10 @@ export class GoogleDriveStorageProvider {
     dateTaken?: string,
     userId?: string
   ): Promise<StorageUploadResult> {
-    const ext = filename.split('.').pop() || 'jpg';
+    const rawExt = path.basename(filename).split('.').pop() || 'jpg';
+    const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
     const cleanFilename = `${photoId}.${ext}`;
-    const base64Content = dataBase64.replace(/^data:image\/\w+;base64,/, '');
+    const base64Content = dataBase64.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
     const buffer = Buffer.from(base64Content, 'base64');
     const fileSize = buffer.length;
 
@@ -394,11 +402,12 @@ export class GoogleDriveStorageProvider {
           folderPath: driveFolderPath,
         });
 
-        // Deduct used storage on this account
+        // Deduct used storage on this account and persist
         targetAccount.storageUsed += fileSize;
         targetAccount.storageAvailable = Math.max(0, targetAccount.storageLimit - targetAccount.storageUsed);
         targetAccount.photoCount = (targetAccount.photoCount || 0) + 1;
         targetAccount.updatedAt = new Date().toISOString();
+        this.saveAccountsToFile();
 
         console.log(
           `[Drive Storage] Successfully uploaded to ${targetAccount.googleAccountEmail} (File ID: ${uploadResult.fileId}). Storage remaining: ${(targetAccount.storageAvailable / (1024 * 1024)).toFixed(1)} MB.`
@@ -498,7 +507,12 @@ export class GoogleDriveStorageProvider {
 
         return { fileId: driveFile.id, folderId: folderId || 'drive_root' };
       } catch (driveApiErr: any) {
-        console.warn('[Google Drive API] Remote API failed, using managed account storage:', driveApiErr?.message || driveApiErr);
+        // Attempt token refresh if expired, otherwise rethrow so uploadPhoto fails over to next priority account
+        const refreshed = await this.refreshAccessToken(params.accountId);
+        if (!refreshed) {
+          throw driveApiErr;
+        }
+        throw driveApiErr;
       }
     }
 
@@ -597,14 +611,24 @@ export class GoogleDriveStorageProvider {
 
       // Also clean up local file if present
       if (filename) {
-        const publicFile = path.join(process.cwd(), 'public', 'uploads', filename);
-        if (fs.existsSync(publicFile)) fs.unlinkSync(publicFile);
+        const safeName = path.basename(filename);
+        const publicFile = path.join(process.cwd(), 'public', 'uploads', safeName);
+        if (fs.existsSync(publicFile)) {
+          const stat = fs.statSync(publicFile);
+          fs.unlinkSync(publicFile);
+          const acc = this.accounts.get(accountId);
+          if (acc) {
+            acc.storageUsed = Math.max(0, acc.storageUsed - stat.size);
+            acc.storageAvailable = Math.max(0, acc.storageLimit - acc.storageUsed);
+          }
+        }
       }
 
       const acc = this.accounts.get(accountId);
-      if (acc && acc.photoCount > 0) {
-        acc.photoCount--;
+      if (acc) {
+        if (acc.photoCount > 0) acc.photoCount--;
         acc.updatedAt = new Date().toISOString();
+        this.saveAccountsToFile();
       }
 
       return true;
@@ -618,27 +642,21 @@ export class GoogleDriveStorageProvider {
    * Download a photo stream from Google Drive or cached storage
    */
   public async downloadFile(accountId: string, fileId: string, filename?: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    const safeFilename = filename ? path.basename(filename) : undefined;
+
     // 1. Check local cached file
-    if (filename) {
-      const publicPath = path.join(process.cwd(), 'public', 'uploads', filename);
+    if (safeFilename) {
+      const publicPath = path.join(process.cwd(), 'public', 'uploads', safeFilename);
       if (fs.existsSync(publicPath)) {
         return {
           buffer: fs.readFileSync(publicPath),
-          mimeType: filename.endsWith('.png') ? 'image/png' : 'image/jpeg',
+          mimeType: safeFilename.endsWith('.png') ? 'image/png' : 'image/jpeg',
         };
       }
     }
 
-    // 2. Fetch from Google Drive API if remote
-    let activeToken = this.credentials.get(accountId)?.accessToken;
-    if (!activeToken) {
-      for (const cred of this.credentials.values()) {
-        if (cred.accessToken) {
-          activeToken = cred.accessToken;
-          break;
-        }
-      }
-    }
+    // 2. Fetch from Google Drive API using only this account's own credentials
+    const activeToken = this.credentials.get(accountId)?.accessToken;
 
     if (activeToken && !fileId.startsWith('drive_file_')) {
       try {
@@ -698,7 +716,7 @@ export class GoogleDriveStorageProvider {
    */
   public getPooledStats(userId?: string) {
     const all = Array.from(this.accounts.values()).filter(
-      (a) => !userId || a.userId === userId || a.userId === 'user_default'
+      (a) => !userId || a.userId === userId
     );
     const active = all.filter((a) => a.status === 'active');
     const sorted = [...active].sort((a, b) => a.priority - b.priority);

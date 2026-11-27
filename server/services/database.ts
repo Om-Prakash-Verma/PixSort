@@ -6,7 +6,6 @@ import {
   doc,
   setDoc,
   getDocs,
-  getDoc,
   updateDoc,
   deleteDoc,
   setLogLevel,
@@ -15,7 +14,6 @@ import fs from 'fs';
 import path from 'path';
 import { Photo, Album } from '../../src/types.js';
 
-// Suppress repetitive gRPC connection retry spam when Firestore DB is not yet created
 try {
   setLogLevel('error');
 } catch {
@@ -42,16 +40,32 @@ try {
   console.warn('[Firestore] Initialization warning, utilizing in-memory operational cache:', err);
 }
 
+function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = value;
+    }
+  }
+  return clean as Partial<T>;
+}
+
 export class FirestoreDatabaseService {
   private photos: Map<string, Photo> = new Map();
   private albums: Map<string, Album> = new Map();
-  private favorites: Set<string> = new Set(); // photoIds
-  private isFirestoreSynced: boolean = false;
+  private syncPromise: Promise<void>;
 
   constructor() {
-    this.initFirestoreSync().catch((err) => {
+    this.syncPromise = this.initFirestoreSync().catch((err) => {
       console.warn('[Firestore] Background sync notice:', err.message);
     });
+  }
+
+  /**
+   * Resolves once initial Firestore hydration completes (or fails gracefully)
+   */
+  async waitForReady(): Promise<void> {
+    await this.syncPromise;
   }
 
   /**
@@ -61,20 +75,16 @@ export class FirestoreDatabaseService {
     if (!firestoreDb) return;
 
     try {
-      // Check photos collection
       const photosSnap = await getDocs(collection(firestoreDb, 'photos'));
       this.photos.clear();
-      this.favorites.clear();
       if (photosSnap.docs.length > 0) {
         console.log(`[Firestore] Loaded ${photosSnap.docs.length} persistent photos from cloud Firestore.`);
         photosSnap.docs.forEach((d) => {
           const p = d.data() as Photo;
           this.photos.set(p.id, p);
-          if (p.isFavorite) this.favorites.add(p.id);
         });
       }
 
-      // Check albums collection
       const albumsSnap = await getDocs(collection(firestoreDb, 'albums'));
       this.albums.clear();
       if (albumsSnap.docs.length > 0) {
@@ -84,11 +94,10 @@ export class FirestoreDatabaseService {
         });
       }
 
-      this.isFirestoreSynced = true;
       console.log('[Firestore] Cloud database synchronized.');
     } catch (err: any) {
       if (err.message?.includes('NOT_FOUND') || err.code === 'not-found' || err.message?.includes('not-found')) {
-        console.warn(`[Firestore] Notice: Cloud Firestore database has not been provisioned yet in project '${firestoreProject}'. PixSort will run in fast memory cache mode. To enable cloud persistence, click "Create database" at: https://console.firebase.google.com/project/${firestoreProject}/firestore`);
+        console.warn(`[Firestore] Notice: Cloud Firestore database has not been provisioned yet in project '${firestoreProject}'. PixSort will run in fast memory cache mode.`);
         firestoreDb = null;
       } else {
         console.warn('[Firestore] Sync notice:', err.message);
@@ -98,11 +107,10 @@ export class FirestoreDatabaseService {
 
   // --- Photo Operations ---
 
-  async getPhotos(userId: string = 'user_default', filters?: {
+  async getPhotos(userId: string, filters?: {
     albumId?: string;
     isFavorite?: boolean;
     isTrash?: boolean;
-    category?: string;
   }): Promise<Photo[]> {
     let list = Array.from(this.photos.values()).filter((p) => p.userId === userId);
 
@@ -120,8 +128,14 @@ export class FirestoreDatabaseService {
       list = list.filter((p) => p.albumIds.includes(filters.albumId!));
     }
 
-    // Sort by dateTaken descending
     return list.sort((a, b) => new Date(b.dateTaken).getTime() - new Date(a.dateTaken).getTime());
+  }
+
+  /**
+   * Used only by startup vector index bootstrap across all users
+   */
+  getAllPhotosForIndex(): Photo[] {
+    return Array.from(this.photos.values()).filter((p) => !p.isTrash);
   }
 
   async getPhotoById(photoId: string): Promise<Photo | null> {
@@ -147,14 +161,13 @@ export class FirestoreDatabaseService {
 
   async createPhoto(photo: Photo): Promise<Photo> {
     this.photos.set(photo.id, photo);
-    if (photo.isFavorite) {
-      this.favorites.add(photo.id);
-    }
 
     if (firestoreDb) {
-      setDoc(doc(firestoreDb, 'photos', photo.id), photo).catch((err) => {
+      try {
+        await setDoc(doc(firestoreDb, 'photos', photo.id), stripUndefined(photo));
+      } catch (err: any) {
         console.warn(`[Firestore] Failed to persist photo ${photo.id}:`, err.message);
-      });
+      }
     }
 
     return photo;
@@ -164,21 +177,16 @@ export class FirestoreDatabaseService {
     const existing = this.photos.get(photoId);
     if (!existing) return null;
 
-    const updated = { ...existing, ...updates };
+    const cleanUpdates = stripUndefined(updates);
+    const updated = { ...existing, ...cleanUpdates };
     this.photos.set(photoId, updated);
 
-    if (updates.isFavorite !== undefined) {
-      if (updates.isFavorite) {
-        this.favorites.add(photoId);
-      } else {
-        this.favorites.delete(photoId);
-      }
-    }
-
-    if (firestoreDb) {
-      updateDoc(doc(firestoreDb, 'photos', photoId), updates).catch((err) => {
+    if (firestoreDb && Object.keys(cleanUpdates).length > 0) {
+      try {
+        await updateDoc(doc(firestoreDb, 'photos', photoId), cleanUpdates);
+      } catch (err: any) {
         console.warn(`[Firestore] Failed to update photo ${photoId}:`, err.message);
-      });
+      }
     }
 
     return updated;
@@ -186,12 +194,13 @@ export class FirestoreDatabaseService {
 
   async deletePhoto(photoId: string, permanent: boolean = false): Promise<boolean> {
     if (permanent) {
-      this.favorites.delete(photoId);
       const res = this.photos.delete(photoId);
       if (firestoreDb) {
-        deleteDoc(doc(firestoreDb, 'photos', photoId)).catch((err) => {
+        try {
+          await deleteDoc(doc(firestoreDb, 'photos', photoId));
+        } catch (err: any) {
           console.warn(`[Firestore] Failed to delete photo ${photoId}:`, err.message);
-        });
+        }
       }
       return res;
     } else {
@@ -200,9 +209,11 @@ export class FirestoreDatabaseService {
       existing.isTrash = true;
       this.photos.set(photoId, existing);
       if (firestoreDb) {
-        updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: true }).catch((err) => {
+        try {
+          await updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: true });
+        } catch (err: any) {
           console.warn(`[Firestore] Failed to mark photo ${photoId} as trash:`, err.message);
-        });
+        }
       }
       return true;
     }
@@ -214,21 +225,26 @@ export class FirestoreDatabaseService {
     existing.isTrash = false;
     this.photos.set(photoId, existing);
     if (firestoreDb) {
-      updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: false }).catch((err) => {
+      try {
+        await updateDoc(doc(firestoreDb, 'photos', photoId), { isTrash: false });
+      } catch (err: any) {
         console.warn(`[Firestore] Failed to restore photo ${photoId}:`, err.message);
-      });
+      }
     }
     return true;
   }
 
   // --- Album Operations ---
 
-  async getAlbums(userId: string = 'user_default'): Promise<Album[]> {
+  async getAlbumById(albumId: string): Promise<Album | null> {
+    return this.albums.get(albumId) || null;
+  }
+
+  async getAlbums(userId: string): Promise<Album[]> {
     const albums = Array.from(this.albums.values()).filter((a) => a.userId === userId);
-    // update photo counts and cover photo
     return albums.map((alb) => {
       const albumPhotos = Array.from(this.photos.values()).filter(
-        (p) => !p.isTrash && p.albumIds.includes(alb.id)
+        (p) => p.userId === userId && !p.isTrash && p.albumIds.includes(alb.id)
       );
       return {
         ...alb,
@@ -238,7 +254,7 @@ export class FirestoreDatabaseService {
     });
   }
 
-  async createAlbum(userId: string = 'user_default', name: string): Promise<Album> {
+  async createAlbum(userId: string, name: string): Promise<Album> {
     const id = `album_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newAlbum: Album = {
       id,
@@ -250,16 +266,17 @@ export class FirestoreDatabaseService {
     this.albums.set(id, newAlbum);
 
     if (firestoreDb) {
-      setDoc(doc(firestoreDb, 'albums', id), newAlbum).catch((err) => {
+      try {
+        await setDoc(doc(firestoreDb, 'albums', id), newAlbum);
+      } catch (err: any) {
         console.warn(`[Firestore] Failed to persist album ${id}:`, err.message);
-      });
+      }
     }
 
     return newAlbum;
   }
 
   async deleteAlbum(albumId: string): Promise<boolean> {
-    // Remove albumId from all photos
     for (const photo of this.photos.values()) {
       if (photo.albumIds.includes(albumId)) {
         photo.albumIds = photo.albumIds.filter((id) => id !== albumId);
@@ -270,7 +287,11 @@ export class FirestoreDatabaseService {
     }
 
     if (firestoreDb) {
-      deleteDoc(doc(firestoreDb, 'albums', albumId)).catch(() => {});
+      try {
+        await deleteDoc(doc(firestoreDb, 'albums', albumId));
+      } catch {
+        // ignore
+      }
     }
 
     return this.albums.delete(albumId);
@@ -288,7 +309,11 @@ export class FirestoreDatabaseService {
     this.photos.set(photoId, photo);
 
     if (firestoreDb) {
-      updateDoc(doc(firestoreDb, 'photos', photoId), { albumIds: photo.albumIds }).catch(() => {});
+      try {
+        await updateDoc(doc(firestoreDb, 'photos', photoId), { albumIds: photo.albumIds });
+      } catch {
+        // ignore
+      }
     }
 
     return photo;
@@ -296,10 +321,10 @@ export class FirestoreDatabaseService {
 
   getStats(userId?: string) {
     const all = Array.from(this.photos.values()).filter(
-      (p) => !userId || p.userId === userId || p.userId === 'user_default'
+      (p) => !userId || p.userId === userId
     );
     const userAlbums = Array.from(this.albums.values()).filter(
-      (a) => !userId || a.userId === userId || a.userId === 'user_default'
+      (a) => !userId || a.userId === userId
     );
     return {
       total: all.length,
@@ -314,27 +339,35 @@ export class FirestoreDatabaseService {
   }
 
   /**
-   * Clears all photos and albums from Firestore cloud collections and in-memory cache
+   * Clears only a specific user's photos and albums from memory and Firestore
    */
-  public async clearAllData(): Promise<void> {
-    this.photos.clear();
-    this.albums.clear();
-    this.favorites.clear();
+  public async clearUserData(userId: string): Promise<void> {
+    const photoIdsToDelete: string[] = [];
+    for (const [id, photo] of this.photos.entries()) {
+      if (photo.userId === userId) {
+        this.photos.delete(id);
+        photoIdsToDelete.push(id);
+      }
+    }
+
+    const albumIdsToDelete: string[] = [];
+    for (const [id, album] of this.albums.entries()) {
+      if (album.userId === userId) {
+        this.albums.delete(id);
+        albumIdsToDelete.push(id);
+      }
+    }
 
     if (firestoreDb) {
       try {
-        const photosSnap = await getDocs(collection(firestoreDb, "photos"));
-        for (const d of photosSnap.docs) {
-          await deleteDoc(doc(firestoreDb, "photos", d.id));
+        for (const id of photoIdsToDelete) {
+          await deleteDoc(doc(firestoreDb, 'photos', id));
         }
-
-        const albumsSnap = await getDocs(collection(firestoreDb, "albums"));
-        for (const d of albumsSnap.docs) {
-          await deleteDoc(doc(firestoreDb, "albums", d.id));
+        for (const id of albumIdsToDelete) {
+          await deleteDoc(doc(firestoreDb, 'albums', id));
         }
-        console.log("[Firestore] All documents successfully cleared from Firestore cloud collections.");
       } catch (err: any) {
-        console.warn("[Firestore] Error while clearing cloud collections:", err.message);
+        console.warn('[Firestore] Error while clearing user data:', err.message);
       }
     }
   }

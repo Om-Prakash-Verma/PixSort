@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Database, HardDrive, Sparkles, Layers, ArrowRight, CheckCircle2, Cloud } from 'lucide-react';
+import { X, Cpu, Database, HardDrive, Sparkles, Layers, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 
 interface ArchitectureInspectorModalProps {
@@ -14,7 +14,12 @@ export const ArchitectureInspectorModal: React.FC<ArchitectureInspectorModalProp
   onRunTestQuery,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Google Cloud AI Search Architecture"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+    >
       <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl neo-raised-lg bg-[#EEF2F6] p-6 space-y-6 border border-white/80">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">

@@ -8,19 +8,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ExternalLink,
-  ShieldCheck,
   RotateCcw,
   Sparkles,
-  Info,
-  Server,
   Cloud,
-  ChevronRight,
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConnectedDriveAccount } from '../types.js';
 import { AuthUser } from './AuthModal.js';
+import { authFetch, getFirebaseConfig } from '../utils/api.js';
 
 interface StorageSettingsViewProps {
   onNotify?: (msg: string) => void;
@@ -40,8 +36,6 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   // Connect modal state
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [customEmail, setCustomEmail] = useState('');
-  const [customQuotaGb, setCustomQuotaGb] = useState('15');
-  const [customUsedGb, setCustomUsedGb] = useState('1.5');
   const [isConnecting, setIsConnecting] = useState(false);
 
   // Disconnect warning modal state (Section 15 requirement)
@@ -55,9 +49,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/drive/accounts', {
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch('/api/drive/accounts', {}, currentUser);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
@@ -100,11 +92,15 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
     setAccounts(newAccounts);
 
     try {
-      const res = await fetch('/api/drive/accounts/priority', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountIds: newAccounts.map((a) => a.id) }),
-      });
+      const res = await authFetch(
+        '/api/drive/accounts/priority',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountIds: newAccounts.map((a) => a.id) }),
+        },
+        currentUser
+      );
       if (res.ok) {
         onNotify?.('Storage priority updated');
         onAccountsUpdated?.();
@@ -120,9 +116,11 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
     if (!accountToDisconnect) return;
     setIsDisconnecting(true);
     try {
-      const res = await fetch(`/api/drive/accounts/${accountToDisconnect.id}/disconnect`, {
-        method: 'POST',
-      });
+      const res = await authFetch(
+        `/api/drive/accounts/${accountToDisconnect.id}/disconnect`,
+        { method: 'POST' },
+        currentUser
+      );
       if (res.ok) {
         onNotify?.(`Disconnected ${accountToDisconnect.googleAccountEmail}. Files preserved.`);
         setAccountToDisconnect(null);
@@ -141,10 +139,11 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
     if (!accountToDelete) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/drive/accounts/${accountToDelete.id}`, {
-        method: 'DELETE',
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(
+        `/api/drive/accounts/${accountToDelete.id}`,
+        { method: 'DELETE' },
+        currentUser
+      );
       if (res.ok) {
         onNotify?.(`Storage account ${accountToDelete.googleAccountEmail} deleted.`);
         setAccountToDelete(null);
@@ -165,9 +164,11 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   // Reconnect account
   const handleReconnect = async (account: ConnectedDriveAccount) => {
     try {
-      const res = await fetch(`/api/drive/accounts/${account.id}/reconnect`, {
-        method: 'POST',
-      });
+      const res = await authFetch(
+        `/api/drive/accounts/${account.id}/reconnect`,
+        { method: 'POST' },
+        currentUser
+      );
       if (res.ok) {
         onNotify?.(`Reconnected ${account.googleAccountEmail}`);
         await fetchAccounts();
@@ -182,7 +183,7 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const handleRefreshStats = async (account: ConnectedDriveAccount) => {
     setRefreshingId(account.id);
     try {
-      const res = await fetch(`/api/drive/accounts/${account.id}/stats`);
+      const res = await authFetch(`/api/drive/accounts/${account.id}/stats`, {}, currentUser);
       if (res.ok) {
         await fetchAccounts();
         onNotify?.(`Quota refreshed for ${account.googleAccountEmail}`);
@@ -203,19 +204,20 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   ) => {
     try {
       setIsConnecting(true);
-      const res = await fetch('/api/drive/accounts/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+      const res = await authFetch(
+        '/api/drive/accounts/connect',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            storageLimitGb,
+            storageUsedGb,
+            accessToken,
+          }),
         },
-        body: JSON.stringify({
-          email: email.trim(),
-          storageLimitGb,
-          storageUsedGb,
-          accessToken,
-        }),
-      });
+        currentUser
+      );
 
       if (res.ok) {
         onNotify?.(`Connected Google Drive account: ${email.trim()}`);
@@ -238,22 +240,17 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
   const handleConnectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customEmail.trim()) return;
-    await connectAccountByEmail(
-      customEmail.trim(),
-      parseFloat(customQuotaGb) || 15,
-      parseFloat(customUsedGb) || 1.5
-    );
+    await connectAccountByEmail(customEmail.trim(), 15, 1.5);
   };
 
   // Google Sign-In Popup with Drive scopes
   const handleGooglePopupAuth = async () => {
     try {
       setIsConnecting(true);
-      const configRes = await fetch('/api/drive/config');
-      if (!configRes.ok) {
+      const config = await getFirebaseConfig();
+      if (!config) {
         throw new Error('Configuration not available');
       }
-      const config = await configRes.json();
 
       const { initializeApp, getApps } = await import('firebase/app');
       const { getAuth, GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
@@ -267,7 +264,10 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken;
-      const email = result.user?.email || 'omprakashverma.in@gmail.com';
+      const email = result.user?.email;
+      if (!email) {
+        throw new Error('Google account email was not provided by OAuth');
+      }
 
       await connectAccountByEmail(email, 15, 1.2, accessToken);
     } catch (err: any) {
@@ -281,21 +281,6 @@ export const StorageSettingsView: React.FC<StorageSettingsViewProps> = ({
       onNotify?.(msg);
     } finally {
       setIsConnecting(false);
-    }
-  };
-
-  // Real Google OAuth trigger
-  const handleStartOAuth = async () => {
-    try {
-      const res = await fetch('/api/drive/oauth/url');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          window.location.href = data.url;
-        }
-      }
-    } catch (err) {
-      console.error('OAuth redirect error:', err);
     }
   };
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Layers, Sparkles } from 'lucide-react';
+import { X, Layers } from 'lucide-react';
 import { Photo } from '../types.js';
 import { PhotoCard } from './PhotoCard.js';
 
@@ -25,7 +25,12 @@ export const SimilarPhotosModal: React.FC<SimilarPhotosModalProps> = ({
   if (!sourcePhoto) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Similar Photos"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6"
+    >
       <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl neo-raised-lg bg-[#EEF2F6] p-6 space-y-5 border border-white/80">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
@@ -43,7 +48,7 @@ export const SimilarPhotosModal: React.FC<SimilarPhotosModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Matched via existing 768-D image embedding — no re-embedding required
+                Matched via existing 3072-D dense embedding — no re-embedding required
               </p>
             </div>
           </div>

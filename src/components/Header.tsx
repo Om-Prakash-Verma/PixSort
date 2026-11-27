@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Sparkles, Upload, SlidersHorizontal, Info, Layers, Presentation, History, Trash2, ArrowUpRight, LogOut, User } from 'lucide-react';
+import { Search, X, Sparkles, Upload, Layers, Presentation, History, Trash2, LogOut, Menu } from 'lucide-react';
 import { SystemStatus } from '../types.js';
 import { AuthUser } from './AuthModal.js';
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   onOpenUpload: () => void;
   onOpenInspector: () => void;
   onOpenPresentation: () => void;
+  onOpenMobileMenu?: () => void;
   systemStatus: SystemStatus | null;
   isSearching: boolean;
   currentUser?: AuthUser | null;
@@ -40,15 +41,16 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenUpload,
   onOpenInspector,
   onOpenPresentation,
-  systemStatus,
+  onOpenMobileMenu,
   isSearching,
   currentUser,
   onLogout,
 }) => {
+  const storageKey = `${RECENT_SEARCHES_STORAGE_KEY}_${currentUser?.uid || 'anon'}`;
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
+      const saved = localStorage.getItem(`${RECENT_SEARCHES_STORAGE_KEY}_${currentUser?.uid || 'anon'}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -58,6 +60,22 @@ export const Header: React.FC<HeaderProps> = ({
     }
     return ['college id card', 'Pool party', 'Beach photos'];
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed);
+          return;
+        }
+      }
+      setRecentSearches(['college id card', 'Pool party', 'Beach photos']);
+    } catch {
+      // ignore
+    }
+  }, [storageKey]);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
       const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
       const updated = [trimmed, ...filtered].slice(0, 8);
       try {
-        localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch {
         // ignore
       }
@@ -91,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
     setRecentSearches((prev) => {
       const updated = prev.filter((item) => item !== itemToRemove);
       try {
-        localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch {
         // ignore
       }
@@ -103,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
     e.stopPropagation();
     setRecentSearches([]);
     try {
-      localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
+      localStorage.removeItem(storageKey);
     } catch {
       // ignore
     }
@@ -130,7 +148,17 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 bg-[#EEF2F6] border-b border-slate-200/80 px-4 lg:px-8 py-3.5 flex items-center justify-between gap-4">
       {/* Brand Logo & Name */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2.5 shrink-0">
+        {onOpenMobileMenu && (
+          <button
+            onClick={onOpenMobileMenu}
+            className="md:hidden p-2.5 rounded-2xl neo-btn text-slate-600 hover:text-slate-900"
+            aria-label="Open navigation menu"
+            title="Menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        )}
         <div className="w-10 h-10 rounded-2xl neo-raised flex items-center justify-center text-blue-600">
           <Sparkles className="w-5 h-5 text-blue-600" />
         </div>
@@ -209,15 +237,22 @@ export const Header: React.FC<HeaderProps> = ({
                   {recentSearches.map((item) => (
                     <div
                       key={item}
-                      onClick={() => handleSelectQuery(item)}
-                      className="group px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 neo-btn hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-all border border-slate-200/50"
+                      className="group px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 neo-btn flex items-center gap-1.5 transition-all border border-slate-200/50"
                     >
-                      <History className="w-3 h-3 text-blue-500 shrink-0" />
-                      <span>{item}</span>
                       <button
+                        type="button"
+                        onClick={() => handleSelectQuery(item)}
+                        className="flex items-center gap-1.5 hover:text-blue-700 cursor-pointer"
+                      >
+                        <History className="w-3 h-3 text-blue-500 shrink-0" />
+                        <span>{item}</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={(e) => removeRecentSearch(item, e)}
                         className="opacity-40 group-hover:opacity-100 p-0.5 rounded-full hover:bg-rose-100 hover:text-rose-600 transition-all text-slate-400"
                         title={`Remove "${item}"`}
+                        aria-label={`Remove "${item}"`}
                       >
                         <X className="w-3 h-3" />
                       </button>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Calendar, Filter, Sparkles, ArrowUpDown, Heart, MapPin, SearchX, Keyboard } from 'lucide-react';
+import { Calendar, Sparkles, ArrowUpDown, Heart, MapPin, SearchX, Keyboard } from 'lucide-react';
 import { Photo, SearchInterpretedFilter } from '../types.js';
 import { PhotoCard } from './PhotoCard.js';
 
@@ -34,6 +34,12 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
   const [filterFavoritesOnly, setFilterFavoritesOnly] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setFilterFavoritesOnly(false);
+    setSelectedLocation('all');
+    setSortBy('relevance');
+  }, [searchQuery]);
 
   // Extract unique locations
   const availableLocations = useMemo(() => {
@@ -195,6 +201,29 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
             Clear Search & View All Photos
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (processedPhotos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="w-16 h-16 rounded-3xl neo-raised flex items-center justify-center text-slate-400 mb-4">
+          <SearchX className="w-8 h-8 text-slate-400" />
+        </div>
+        <h3 className="text-base font-bold text-slate-700 mb-1">No photos match active filters</h3>
+        <p className="text-xs text-slate-500 max-w-sm mb-5">
+          Try clearing the favorites or location filter to see all {photos.length} photos.
+        </p>
+        <button
+          onClick={() => {
+            setFilterFavoritesOnly(false);
+            setSelectedLocation('all');
+          }}
+          className="px-4 py-2 rounded-2xl neo-btn text-xs font-semibold text-blue-700"
+        >
+          Reset Filters
+        </button>
       </div>
     );
   }

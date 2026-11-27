@@ -19,25 +19,28 @@ export interface VectorSearchResult {
 export class VertexAIVectorSearchService {
   private index: Map<string, VectorItem> = new Map();
 
-  /**
-   * Adds or updates a vector embedding in the index
-   */
   async upsertVector(item: VectorItem): Promise<void> {
     this.index.set(item.id, item);
   }
 
-  /**
-   * Removes a vector from the index
-   */
   async deleteVector(id: string): Promise<boolean> {
     return this.index.delete(id);
   }
 
-  /**
-   * Get vector by photoId
-   */
   getVector(id: string): VectorItem | undefined {
     return this.index.get(id);
+  }
+
+  /**
+   * Returns true if the user has any indexed vectors of the given dimension
+   */
+  hasVectorsWithDimension(userId: string, dimension: number): boolean {
+    for (const item of this.index.values()) {
+      if (item.userId === userId && item.vector.length === dimension) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -47,7 +50,7 @@ export class VertexAIVectorSearchService {
     queryVector: number[],
     filters?: {
       userId?: string;
-      datePattern?: string; // e.g. "2026-07" or "2026"
+      datePattern?: string;
       location?: string;
       isFavorite?: boolean;
       albumId?: string;
@@ -74,10 +77,12 @@ export class VertexAIVectorSearchService {
         if (!item.metadata.location.toLowerCase().includes(filters.location.toLowerCase())) continue;
       }
 
+      // Never compare vectors from incompatible embedding spaces/dimensions
+      if (item.vector.length !== queryVector.length) continue;
+
       const itemNorm = this.vectorNorm(item.vector);
       if (itemNorm === 0) continue;
 
-      // Cosine similarity = dot(A, B) / (norm(A) * norm(B))
       const dot = this.dotProduct(queryVector, item.vector);
       const similarity = dot / (queryNorm * itemNorm);
 
@@ -87,27 +92,31 @@ export class VertexAIVectorSearchService {
       });
     }
 
-    // Sort descending by score
     results.sort((a, b) => b.score - a.score);
     return results.slice(0, topK);
   }
 
   /**
-   * Find similar photos directly using the existing vector embedding in Vertex AI Vector Search
+   * Find similar photos directly using the existing vector embedding
    */
   async findSimilarPhotos(
     photoId: string,
-    topK: number = 6
+    topK: number = 6,
+    userId?: string
   ): Promise<VectorSearchResult[]> {
     const target = this.index.get(photoId);
     if (!target) return [];
+    if (userId && target.userId !== userId) return [];
 
-    const all = await this.queryNearestNeighbors(target.vector, {
-      userId: target.userId,
-      excludeTrash: true,
-    }, topK + 1);
+    const all = await this.queryNearestNeighbors(
+      target.vector,
+      {
+        userId: target.userId,
+        excludeTrash: true,
+      },
+      topK + 1
+    );
 
-    // Exclude the source photo itself
     return all.filter((r) => r.id !== photoId).slice(0, topK);
   }
 
@@ -115,9 +124,17 @@ export class VertexAIVectorSearchService {
     if (!userId) return this.index.size;
     let count = 0;
     for (const item of this.index.values()) {
-      if (item.userId === userId || item.userId === 'user_default') count++;
+      if (item.userId === userId) count++;
     }
     return count;
+  }
+
+  clearUser(userId: string) {
+    for (const [id, item] of this.index.entries()) {
+      if (item.userId === userId) {
+        this.index.delete(id);
+      }
+    }
   }
 
   clear() {
@@ -125,9 +142,8 @@ export class VertexAIVectorSearchService {
   }
 
   private dotProduct(a: number[], b: number[]): number {
-    const len = Math.min(a.length, b.length);
     let sum = 0;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < a.length; i++) {
       sum += a[i] * b[i];
     }
     return sum;

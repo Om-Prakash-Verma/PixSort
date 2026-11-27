@@ -12,13 +12,17 @@ import { PresentationDeck } from './components/presentation/PresentationDeck.js'
 import { AuthModal, AuthUser } from './components/AuthModal.js';
 import { LandingPage } from './components/LandingPage.js';
 import { Photo, Album, SearchResponse, SystemStatus } from './types.js';
-import { ArrowLeft, RefreshCw, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
+import { authFetch, getFirebaseAuthInstance } from './utils/api.js';
+import { ArrowLeft, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('photos');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+  const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // User Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
@@ -63,10 +67,12 @@ export default function App() {
   });
 
   const [notification, setNotification] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+    toastTimerRef.current = setTimeout(() => setNotification(null), 3500);
   };
 
   // Listen for Firebase Auth state changes
@@ -74,31 +80,37 @@ export default function App() {
     let unsubscribe: (() => void) | undefined;
     (async () => {
       try {
-        const configRes = await fetch('/api/drive/config');
-        if (configRes.ok) {
-          const config = await configRes.json();
-          const { initializeApp, getApps } = await import('firebase/app');
-          const { getAuth, onAuthStateChanged } = await import('firebase/auth');
-          const apps = getApps();
-          const app = apps.length > 0 ? apps[0] : initializeApp(config);
-          const auth = getAuth(app);
-          unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-              const u: AuthUser = {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || user.email?.split('@')[0] || 'User',
-                photoURL: user.photoURL,
-              };
-              setCurrentUser(u);
-              try {
-                localStorage.setItem('pixsort_user', JSON.stringify(u));
-              } catch {
-                // ignore
-              }
+        const auth = await getFirebaseAuthInstance();
+        if (!auth) return;
+        const { onAuthStateChanged } = await import('firebase/auth');
+        unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (user) {
+            const u: AuthUser = {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || user.email?.split('@')[0] || 'User',
+              photoURL: user.photoURL,
+            };
+            setCurrentUser((prev) => (prev?.isGuest ? prev : u));
+            try {
+              localStorage.setItem('pixsort_user', JSON.stringify(u));
+            } catch {
+              // ignore
             }
-          });
-        }
+          } else {
+            setCurrentUser((prev) => {
+              if (prev && !prev.isGuest) {
+                try {
+                  localStorage.removeItem('pixsort_user');
+                } catch {
+                  // ignore
+                }
+                return null;
+              }
+              return prev;
+            });
+          }
+        });
       } catch {
         // ignore
       }
@@ -110,6 +122,8 @@ export default function App() {
   }, []);
 
   const handleAuthSuccess = (user: AuthUser) => {
+    searchCacheRef.current.clear();
+    setSearchResponse(null);
     setCurrentUser(user);
     try {
       localStorage.setItem('pixsort_user', JSON.stringify(user));
@@ -121,19 +135,19 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      const configRes = await fetch('/api/drive/config');
-      if (configRes.ok) {
-        const config = await configRes.json();
-        const { initializeApp, getApps } = await import('firebase/app');
-        const { getAuth, signOut } = await import('firebase/auth');
-        const apps = getApps();
-        const app = apps.length > 0 ? apps[0] : initializeApp(config);
-        const auth = getAuth(app);
+      const auth = await getFirebaseAuthInstance();
+      if (auth) {
+        const { signOut } = await import('firebase/auth');
         await signOut(auth);
       }
     } catch {
       // ignore
     }
+    searchCacheRef.current.clear();
+    setSearchResponse(null);
+    setSearchQuery('');
+    setPhotos([]);
+    setAlbums([]);
     setCurrentUser(null);
     try {
       localStorage.removeItem('pixsort_user');
@@ -146,6 +160,7 @@ export default function App() {
   // Load photos based on current context and user
   const loadPhotos = useCallback(async () => {
     if (!currentUser && !isPresentationMode) return;
+    setIsLoadingPhotos(true);
     try {
       let url = '/api/photos';
       const params = new URLSearchParams();
@@ -162,44 +177,43 @@ export default function App() {
         url += `?${params.toString()}`;
       }
 
-      const res = await fetch(url, {
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(url, {}, currentUser);
       if (res.ok) {
         const data: Photo[] = await res.json();
         if (activeTab === 'recent') {
-          // Sort by creation time
           data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         }
         setPhotos(data);
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
+    } finally {
+      setIsLoadingPhotos(false);
     }
   }, [activeTab, selectedAlbum, currentUser, isPresentationMode]);
 
   // Load albums
   const loadAlbums = useCallback(async () => {
     if (!currentUser && !isPresentationMode) return;
+    setIsLoadingAlbums(true);
     try {
-      const res = await fetch('/api/albums', {
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch('/api/albums', {}, currentUser);
       if (res.ok) {
         const data = await res.json();
         setAlbums(data);
       }
     } catch (err) {
       console.error('Failed to load albums:', err);
+    } finally {
+      setIsLoadingAlbums(false);
     }
   }, [currentUser, isPresentationMode]);
 
   // Load system status
   const loadSystemStatus = useCallback(async () => {
+    if (!currentUser) return;
     try {
-      const res = await fetch('/api/system/status', {
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch('/api/system/status', {}, currentUser);
       if (res.ok) {
         const data = await res.json();
         setSystemStatus(data);
@@ -247,14 +261,13 @@ export default function App() {
       return;
     }
 
-    const cacheKey = q.toLowerCase();
+    const cacheKey = `${currentUser?.uid || 'anon'}:${q.toLowerCase()}`;
 
-    // 1. Instant cache lookup: If query was executed previously, return immediately with 0 network calls
     if (searchCacheRef.current.has(cacheKey)) {
       const cached = searchCacheRef.current.get(cacheKey)!;
       setSearchResponse({
         ...cached,
-        executionTimeMs: 0, // 0ms instantaneous cache hit
+        executionTimeMs: 0,
       });
       showToast(`Instant retrieval from local cache (0 API calls)`);
       return;
@@ -262,14 +275,15 @@ export default function App() {
 
     setIsSearching(true);
     try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+      const res = await authFetch(
+        '/api/search',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
         },
-        body: JSON.stringify({ query: q }),
-      });
+        currentUser
+      );
 
       if (res.ok) {
         const data: SearchResponse = await res.json();
@@ -376,13 +390,10 @@ export default function App() {
   const handleToggleFavorite = async (photo: Photo, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/photos/${photo.id}/favorite`, {
-        method: 'PATCH',
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(`/api/photos/${photo.id}/favorite`, { method: 'PATCH' }, currentUser);
       if (res.ok) {
         const updated = await res.json();
-        // Update local state
+        searchCacheRef.current.clear();
         setPhotos((prev) => prev.map((p) => (p.id === photo.id ? updated : p)));
         if (selectedPhoto && selectedPhoto.id === photo.id) {
           setSelectedPhoto(updated);
@@ -395,34 +406,48 @@ export default function App() {
         }
         showToast(updated.isFavorite ? 'Added to favorites' : 'Removed from favorites');
         loadSystemStatus();
+      } else {
+        showToast('Failed to update favorite');
       }
     } catch (err) {
       console.error(err);
+      showToast('Failed to update favorite');
     }
   };
 
   // Toggle album association
   const handleToggleAlbum = async (photo: Photo, albumId: string) => {
     try {
-      const res = await fetch(`/api/photos/${photo.id}/album`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+      const res = await authFetch(
+        `/api/photos/${photo.id}/album`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ albumId }),
         },
-        body: JSON.stringify({ albumId }),
-      });
+        currentUser
+      );
       if (res.ok) {
         const updated = await res.json();
+        searchCacheRef.current.clear();
         setPhotos((prev) => prev.map((p) => (p.id === photo.id ? updated : p)));
         if (selectedPhoto && selectedPhoto.id === photo.id) {
           setSelectedPhoto(updated);
         }
+        if (searchResponse) {
+          setSearchResponse({
+            ...searchResponse,
+            results: searchResponse.results.map((p) => (p.id === photo.id ? updated : p)),
+          });
+        }
         loadAlbums();
         showToast('Album association updated');
+      } else {
+        showToast('Failed to update album');
       }
     } catch (err) {
       console.error(err);
+      showToast('Failed to update album');
     }
   };
 
@@ -430,38 +455,50 @@ export default function App() {
   const handleDeletePhoto = async (photo: Photo) => {
     const isTrashTab = activeTab === 'trash';
     try {
-      const res = await fetch(`/api/photos/${photo.id}?permanent=${isTrashTab}`, {
-        method: 'DELETE',
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(
+        `/api/photos/${photo.id}?permanent=${isTrashTab}`,
+        { method: 'DELETE' },
+        currentUser
+      );
       if (res.ok) {
+        searchCacheRef.current.clear();
         setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
         if (selectedPhoto && selectedPhoto.id === photo.id) {
           setSelectedPhoto(null);
         }
+        if (searchResponse) {
+          setSearchResponse({
+            ...searchResponse,
+            results: searchResponse.results.filter((p) => p.id !== photo.id),
+          });
+        }
         loadAlbums();
         loadSystemStatus();
         showToast(isTrashTab ? 'Photo deleted permanently' : 'Photo moved to Trash');
+      } else {
+        showToast('Failed to delete photo');
       }
     } catch (err) {
       console.error(err);
+      showToast('Failed to delete photo');
     }
   };
 
   // Restore photo from trash
   const handleRestorePhoto = async (photo: Photo) => {
     try {
-      const res = await fetch(`/api/photos/${photo.id}/restore`, {
-        method: 'PATCH',
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(`/api/photos/${photo.id}/restore`, { method: 'PATCH' }, currentUser);
       if (res.ok) {
+        searchCacheRef.current.clear();
         setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
         showToast('Photo restored to library');
         loadSystemStatus();
+      } else {
+        showToast('Failed to restore photo');
       }
     } catch (err) {
       console.error(err);
+      showToast('Failed to restore photo');
     }
   };
 
@@ -471,10 +508,7 @@ export default function App() {
     setSimilarModal({ source: photo, results: [], loading: true });
 
     try {
-      const res = await fetch(`/api/photos/${photo.id}/similar`, {
-        method: 'POST',
-        headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-      });
+      const res = await authFetch(`/api/photos/${photo.id}/similar`, { method: 'POST' }, currentUser);
       if (res.ok) {
         const data = await res.json();
         setSimilarModal({
@@ -494,30 +528,42 @@ export default function App() {
 
   // Create new album
   const handleCreateAlbum = async (name: string) => {
-    const res = await fetch('/api/albums', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
-      },
-      body: JSON.stringify({ name }),
-    });
-    if (res.ok) {
-      loadAlbums();
-      showToast(`Album "${name}" created`);
+    try {
+      const res = await authFetch(
+        '/api/albums',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        },
+        currentUser
+      );
+      if (res.ok) {
+        loadAlbums();
+        showToast(`Album "${name}" created`);
+      } else {
+        showToast('Failed to create album');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to create album');
     }
   };
 
   // Delete album
   const handleDeleteAlbum = async (albumId: string) => {
-    const res = await fetch(`/api/albums/${albumId}`, {
-      method: 'DELETE',
-      headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-    });
-    if (res.ok) {
-      if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
-      loadAlbums();
-      showToast('Album deleted');
+    try {
+      const res = await authFetch(`/api/albums/${albumId}`, { method: 'DELETE' }, currentUser);
+      if (res.ok) {
+        if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
+        loadAlbums();
+        showToast('Album deleted');
+      } else {
+        showToast('Failed to delete album');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete album');
     }
   };
 
@@ -590,6 +636,7 @@ export default function App() {
         onOpenUpload={() => setShowUploadModal(true)}
         onOpenInspector={() => setShowInspectorModal(true)}
         onOpenPresentation={handleOpenPresentation}
+        onOpenMobileMenu={() => setMobileNavOpen(true)}
         systemStatus={systemStatus}
         isSearching={isSearching}
         currentUser={currentUser}
@@ -606,13 +653,15 @@ export default function App() {
             setSelectedAlbum(null);
             handleClearSearch();
           }}
-          favoritesCount={favoritesCount}
-          trashCount={0}
+          favoritesCount={systemStatus?.favoritesCount ?? favoritesCount}
+          trashCount={systemStatus?.trashCount ?? 0}
           albumsCount={albums.length}
           systemStatus={systemStatus}
           onOpenPresentation={handleOpenPresentation}
           currentUser={currentUser}
           onLogout={handleLogout}
+          isMobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
         />
 
         {/* Center Gallery & Content */}
@@ -712,6 +761,11 @@ export default function App() {
                 </div>
               )}
             </div>
+          ) : isLoadingPhotos && photos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-400 text-xs gap-3">
+              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span>Loading your photo library...</span>
+            </div>
           ) : (
             <PhotoGrid
               photos={photos}
@@ -768,6 +822,7 @@ export default function App() {
             handleClearSearch();
           }}
           onUploadSuccess={() => {
+            searchCacheRef.current.clear();
             loadPhotos();
             loadSystemStatus();
             showToast('Photo uploaded and indexed into Vertex AI Vector Search');

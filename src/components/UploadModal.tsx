@@ -9,10 +9,10 @@ import {
   ArrowRight,
   HardDrive,
   AlertTriangle,
-  ExternalLink,
 } from 'lucide-react';
 import { Album, ConnectedDriveAccount } from '../types.js';
 import { AuthUser } from './AuthModal.js';
+import { authFetch } from '../utils/api.js';
 
 interface UploadModalProps {
   albums: Album[];
@@ -46,17 +46,24 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Load active Drive accounts on modal mount
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const res = await fetch('/api/drive/accounts', {
-          headers: currentUser?.uid ? { 'x-user-id': currentUser.uid } : {},
-        });
+        const res = await authFetch('/api/drive/accounts', {}, currentUser);
         if (res.ok) {
           const data = await res.json();
           const active = (data.accounts || []).filter((a: ConnectedDriveAccount) => a.status === 'active');
+          if (!isMountedRef.current) return;
           setAccounts(active);
           if (active.length > 0) {
             setTargetAccount(active[0]);
@@ -88,28 +95,36 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
   }, [file, accounts]);
 
+  const processSelectedFile = (selected: File) => {
+    if (!selected.type.startsWith('image/')) {
+      setErrorMsg('Please select a valid image file (JPEG, PNG, WebP, AVIF).');
+      return;
+    }
+    if (selected.size > 25 * 1024 * 1024) {
+      setErrorMsg('File exceeds the 25 MB upload limit.');
+      return;
+    }
+    setErrorMsg(null);
+    setFile(selected);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (isMountedRef.current) {
+        setPreviewUrl(event.target?.result as string);
+      }
+    };
+    reader.readAsDataURL(selected);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selected = e.target.files[0];
-      setFile(selected);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(selected);
+      processSelectedFile(e.target.files[0]);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const dropped = e.dataTransfer.files[0];
-      setFile(dropped);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(dropped);
+      processSelectedFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -118,30 +133,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     setErrorMsg(null);
     setIsStorageFull(false);
-    setPipelineStep('allocating');
-    setUploadProgress(15);
+    setPipelineStep('uploading');
+    setUploadProgress(35);
 
     try {
-      await new Promise((r) => setTimeout(r, 300));
-      setPipelineStep('uploading');
-      setUploadProgress(45);
-
-      // Step 1: Upload to Google Drive API
-      const res = await fetch('/api/photos/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentUser?.uid ? { 'x-user-id': currentUser.uid } : {}),
+      const res = await authFetch(
+        '/api/photos/upload',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            dataBase64: previewUrl,
+            mimeType: file.type || 'image/jpeg',
+            dateTaken,
+            location: location || 'Personal Album',
+            albumId: selectedAlbumId || undefined,
+          }),
         },
-        body: JSON.stringify({
-          filename: file.name,
-          dataBase64: previewUrl,
-          mimeType: file.type || 'image/jpeg',
-          dateTaken,
-          location: location || 'Personal Album',
-          albumId: selectedAlbumId || undefined,
-        }),
-      });
+        currentUser
+      );
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -149,7 +160,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           res.status === 500 &&
           (errorData.error?.includes('Storage full') || errorData.error?.includes('storage'))
         ) {
-          setIsStorageFull(true);
+          if (isMountedRef.current) setIsStorageFull(true);
           throw new Error(
             errorData.error ||
               'Your connected Google Drive accounts do not have enough available storage for this upload.'
@@ -158,29 +169,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         throw new Error(errorData.error || 'Upload request failed');
       }
 
-      setUploadProgress(72);
-      setPipelineStep('processing');
-      await new Promise((r) => setTimeout(r, 600));
-
-      setUploadProgress(90);
-      setPipelineStep('indexing');
-      await new Promise((r) => setTimeout(r, 600));
-
+      if (!isMountedRef.current) return;
       setUploadProgress(100);
       setPipelineStep('ready');
-      await new Promise((r) => setTimeout(r, 500));
-
       onUploadSuccess();
       onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Failed to process photo');
-      setPipelineStep('idle');
+      if (isMountedRef.current) {
+        setErrorMsg(err.message || 'Failed to process photo');
+        setPipelineStep('idle');
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upload Photo"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+    >
       <div className="w-full max-w-lg rounded-3xl neo-raised-lg bg-[#EEF2F6] p-6 space-y-5 border border-white/80">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
